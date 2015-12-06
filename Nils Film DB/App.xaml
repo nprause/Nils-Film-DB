@@ -1,0 +1,27 @@
+﻿<Application x:Class="Nils_Film_DB.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Nils_Film_DB.ViewModel"
+             xmlns:vw="clr-namespace:Nils_Film_DB.View"
+    Startup="Application_Startup">
+             
+    <Application.Resources>
+
+        <DataTemplate DataType="{x:Type vm:MainWindowViewModel}">
+            <vw:MainWindowView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ConnectViewModel}">
+            <vw:ConnectView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ScanViewModel}">
+            <vw:ScanView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:EditViewModel}">
+            <vw:EditView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MessageBoxViewModel}">
+            <vw:MessageBoxView />
+        </DataTemplate>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Application.Resources>
+</Application>

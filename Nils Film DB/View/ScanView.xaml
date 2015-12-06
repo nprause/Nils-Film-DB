@@ -1,0 +1,88 @@
+﻿<UserControl x:Class="Nils_Film_DB.View.ScanView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="400" d:DesignWidth="600"    >      
+             
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="auto" />
+            <ColumnDefinition  />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="25"  />
+            <RowDefinition MinHeight="25" />
+            <RowDefinition Height="auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- TextBoxes for Scan Options -->
+        <TextBox Grid.Column="1" Height="23" Margin="2" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding TextboxPath}"/>
+        <TextBlock Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2" Text="Pfad:" />
+
+        <TextBox  Grid.Row="1" Grid.Column="1" Margin="2" TextWrapping="Wrap" HorizontalAlignment="Stretch" Text="{Binding TextboxReg}" />
+        <TextBlock Grid.Column="0" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2" Text="Regulärer Ausdruck:" ToolTip="%name: Titel&#x0a;%orig: Originaltitel&#x0a;%jahr: Erscheinungsjahr&#x0a;%land: Produnktionsland&#x0a;%igno: unwichtiger Kram&#x0a;??: In ? eingeschlossene Bereiche werden übernommen falls sie vorhanden sind"/>
+
+
+        <!-- The Progress bar -->
+        <ProgressBar Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="2" Height="auto" HorizontalAlignment="Stretch" Margin="2" Maximum="{Binding ProgressMax}" Value="{Binding ProgressValue}"/>
+        <TextBlock Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" AllowDrop="False" Margin="2" Padding="2" Text="{Binding ProgressText}" />
+
+        
+        <!-- The Tab Control which shows the Output -->
+        <TabControl Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="3" VerticalAlignment="Stretch" SelectedIndex="{Binding TabSelectedIndex}" >
+            <!-- First Tab gives some text feedback -->
+            <TabItem Header="Output" >
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition  />
+                        <RowDefinition Height="auto" />
+                    </Grid.RowDefinitions>
+                    <ScrollViewer Grid.Column="0" Grid.Row="0" VerticalAlignment="Stretch" >
+                        <TextBlock  HorizontalAlignment="Stretch" Margin="2" Padding="2" TextWrapping="Wrap" VerticalAlignment="Stretch" Foreground="#FF19F719" Background="Black" Text="{Binding TextBlockOutput}"/>
+                    </ScrollViewer>
+                    <WrapPanel Grid.Row="1" HorizontalAlignment="Right">
+                        <Button Content="Abbrechen" HorizontalAlignment="Left" VerticalAlignment="Center" Width="75" Margin="2" Command="{Binding ButtonCancel}"/>
+                        <Button Content="{Binding ButtonScanContent}" HorizontalAlignment="Left" VerticalAlignment="Center" Width="75" IsEnabled="{Binding ButtonScanIsEnabled}"  Margin="2" Command="{Binding ButtonScan}"/>
+                    </WrapPanel>
+                </Grid>           
+            </TabItem>
+            
+            <!-- Second Tab shows failed scan attempts and gives possibility to rescan the failures -->
+            <TabItem Header="Fehlschläge" IsEnabled="{Binding TabItemFailIsEnabled}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition  />
+                        <RowDefinition Height="auto" />
+                    </Grid.RowDefinitions>
+                    
+                    <ListView  ItemsSource="{Binding Failures}"/>
+                    <WrapPanel Grid.Row="5" Grid.Column="1" HorizontalAlignment="Right">
+                        <Button Content="Abbrechen" HorizontalAlignment="Left" VerticalAlignment="Center" Width="75" Margin="2" Command="{Binding ButtonCancel}"/>
+                        <Button Content="Neu Scannen" HorizontalAlignment="Left" VerticalAlignment="Center" Width="75" IsEnabled="{Binding ButtonScanIsEnabled}"  Margin="2" Command="{Binding ButtonNewScan}"/>
+                    </WrapPanel>
+                </Grid>
+            </TabItem>
+            
+            <!-- Third Tab shows successful scan results and offers possibilty to add results to database -->
+            <TabItem Header="Erfolge" IsEnabled="{Binding TabItemSuccessIsEnabled}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition  />
+                        <RowDefinition Height="auto" />
+                    </Grid.RowDefinitions>
+
+                    <DataGrid  ItemsSource="{Binding ScanResults}"/>
+                    <WrapPanel Grid.Row="5" Grid.Column="1" HorizontalAlignment="Right">
+                        <Button Content="Abbrechen" HorizontalAlignment="Left" VerticalAlignment="Center" Width="75" Margin="2" Command="{Binding ButtonCancel}"/>
+                        <Button Content="Übernehmen" HorizontalAlignment="Left" VerticalAlignment="Center" Width="75"  Margin="2" Command="{Binding ButtonAccept}"/>
+                    </WrapPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
+     
+    </Grid>
+</UserControl>
