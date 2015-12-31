@@ -200,11 +200,11 @@ namespace Nils_Film_DB.ViewModel
         {
             get
             {
-                return new RelayCommand(param => CloseWindow());
+                return new RelayCommand(param => closeWindow());
             }
         }
      
-        public void CloseWindow()
+        private void closeWindow()
         {         
             //win.Close();
             winHelper.Close(winID);
@@ -282,7 +282,7 @@ namespace Nils_Film_DB.ViewModel
         private void buttonAccept()
         {         
                 Mediator.NotifyColleagues("Metadata", ScanResults);
-                CloseWindow();
+                closeWindow();
         }
 
         // Backgroundworker is used to do stuff in a new thread.
@@ -399,25 +399,34 @@ namespace Nils_Film_DB.ViewModel
         {
             // RegEval analyses the user given regular expression. Returns an error message if the expression is not valid.
             string errorReg = newscan.RegEval(TextboxReg);
-            if (errorReg == null)
+            int number_files = newscan.Fastscan(TextboxPath);
+            if (number_files > -1)
             {
-                if (files != null)
-                    ProgressMax = files.Count();
+                if (errorReg == null)
+                {
+                    if (files != null)
+                        ProgressMax = files.Count();
+                    else
+                    {
+                        ProgressMax = newscan.Fastscan(TextboxPath) - 1;
+                    }
+                    if (ProgressMax > 5000)
+                        TextBlockOutput = "Scanne " + ProgressMax + " Dateien. Geh dir besser erstmal einen Kaffee holen.";
+                    else if (ProgressMax > 1000)
+                        TextBlockOutput = "Scanne " + ProgressMax + " Dateien. Dies könnte etwas dauern.";
+                    else
+                        TextBlockOutput = "Scanne " + ProgressMax + " Dateien...";
+                    Startscan(files);
+                }
                 else
                 {
-                    ProgressMax = newscan.Fastscan(TextboxPath) - 1;
+                    MessageBoxViewModel mbox = new MessageBoxViewModel(winHelper, errorReg);
+                    ButtonScanIsEnabled = true;
                 }
-                if (ProgressMax > 5000)
-                    TextBlockOutput = "Scanne " + ProgressMax + " Dateien. Geh dir besser erstmal einen Kaffee holen.";
-                else if (ProgressMax > 1000)
-                    TextBlockOutput = "Scanne " + ProgressMax + " Dateien. Dies könnte etwas dauern.";
-                else
-                    TextBlockOutput = "Scanne " + ProgressMax + " Dateien...";
-                Startscan(files);
             }
             else
             {
-                MessageBoxViewModel mbox = new MessageBoxViewModel(winHelper, errorReg);
+                MessageBoxViewModel mbox = new MessageBoxViewModel(winHelper, TextboxPath + ":\nPfad nicht gefunden");
                 ButtonScanIsEnabled = true;
             }
         }

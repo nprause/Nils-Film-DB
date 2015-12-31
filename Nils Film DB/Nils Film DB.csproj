@@ -55,6 +55,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Windows.Interactivity, Version=4.5.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
@@ -74,6 +75,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="DataAccess\MySQLConnection.cs" />
+    <Compile Include="DataAccess\TMDbConnection.cs" />
     <Compile Include="Helper\Mediator.cs" />
     <Compile Include="Helper\RelayCommand.cs" />
     <Compile Include="Helper\SecureStringConverter.cs" />
@@ -89,6 +91,8 @@
     <Compile Include="ViewModel\EditViewModel.cs" />
     <Compile Include="ViewModel\MainWindowViewModel.cs" />
     <Compile Include="ViewModel\MessageBoxViewModel.cs" />
+    <Compile Include="ViewModel\OnlineDataChoiceViewModel.cs" />
+    <Compile Include="ViewModel\OnlineDataViewModel.cs" />
     <Compile Include="ViewModel\ScanViewModel.cs" />
     <Compile Include="ViewModel\TabControlViewModel.cs" />
     <Compile Include="ViewModel\ViewModel.cs" />
@@ -103,6 +107,12 @@
     </Compile>
     <Compile Include="View\MessageBoxView.xaml.cs">
       <DependentUpon>MessageBoxView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\OnlineDataChoiceView.xaml.cs">
+      <DependentUpon>OnlineDataChoiceView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\OnlineDataView.xaml.cs">
+      <DependentUpon>OnlineDataView.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\ScanView.xaml.cs">
       <DependentUpon>ScanView.xaml</DependentUpon>
@@ -128,6 +138,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\MessageBoxView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\OnlineDataChoiceView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\OnlineDataView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

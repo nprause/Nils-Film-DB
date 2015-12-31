@@ -143,14 +143,21 @@ namespace Nils_Film_DB.DataAccess
         }
 
         // Return DataTable with SQL search string comm. Parameters can be given to prevent SQL injections. 
-        public DataTable GetData(string comm, string parameter, string parameterValue)
+        public DataTable GetData(string comm, List<string> parameter = null, List<string> parameterValue = null)
         {
             MySqlDataAdapter adapter = new MySqlDataAdapter();
             MySqlCommand cmd = new MySqlCommand();
             cmd.CommandText = comm;            
-            cmd.Connection = connection;
+            cmd.Connection = connection;  
+            if (parameter != null)
+            {
+                cmd.Parameters.Clear();
+                for (int i = 0; i < parameter.Count(); ++i)
+                {
+                    cmd.Parameters.AddWithValue(parameter[i], parameterValue[i]);
+                }
+            }
             adapter.SelectCommand = cmd;
-            adapter.SelectCommand.Parameters.AddWithValue(parameter, parameterValue);
             DataTable dt = new DataTable();
             adapter.Fill(dt);           
             return dt;

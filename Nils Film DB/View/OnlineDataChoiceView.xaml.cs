@@ -16,20 +16,13 @@ using System.Windows.Shapes;
 namespace Nils_Film_DB.View
 {
     /// <summary>
-    /// Interaction logic for MainWindowView.xaml
+    /// Interaction logic for OnlineDataChoiceView.xaml
     /// </summary>
-    public partial class MainWindowView : UserControl
+    public partial class OnlineDataChoiceView : UserControl
     {
-        public MainWindowView()
+        public OnlineDataChoiceView()
         {
             InitializeComponent();
         }
-
-        private void OnAutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
-        {
-            if (e.PropertyType == typeof(System.DateTime))
-                (e.Column as DataGridTextColumn).Binding.StringFormat = "dd.MM.yyyy";
-        }
-
     }
 }

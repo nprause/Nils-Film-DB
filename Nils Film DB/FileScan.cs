@@ -77,10 +77,15 @@ namespace Nils_Film_DB
         // The number of total files is returned to update the UI and set the maximum of the progress bar.
         public int Fastscan(string path)
         {
-            files.Clear();
-            numberFiles = 0;
-            fastscan(path);
-            return numberFiles;
+            if (Directory.Exists(path))
+            {
+                files.Clear();
+                numberFiles = 0;
+                fastscan(path);
+                return numberFiles;
+            }
+            else
+                return -1;
         }
       
         public void fastscan(string path)

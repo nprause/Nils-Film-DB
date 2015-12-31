@@ -19,8 +19,14 @@
         <DataTemplate DataType="{x:Type vm:EditViewModel}">
             <vw:EditView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:OnlineDataViewModel}">
+            <vw:OnlineDataView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:MessageBoxViewModel}">
             <vw:MessageBoxView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:OnlineDataChoiceViewModel}">
+            <vw:OnlineDataChoiceView />
         </DataTemplate>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </Application.Resources>

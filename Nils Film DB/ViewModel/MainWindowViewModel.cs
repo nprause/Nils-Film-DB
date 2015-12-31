@@ -42,7 +42,7 @@ namespace Nils_Film_DB.ViewModel
         public MainWindowViewModel(dynamic w)
         {
             winHelper = w;
-            winID = winHelper.Open(this,600,400);
+            winID = winHelper.Open(this,800,600);
 
             // The Mediator is used to exchange data between classes. 
             // Get Login Info from ConnectViewModel
@@ -82,11 +82,11 @@ namespace Nils_Film_DB.ViewModel
         {
             get
             {
-                return new RelayCommand(param => OpenConnect());
+                return new RelayCommand(param => openConnect());
             }
         }
 
-        private void OpenConnect()
+        private void openConnect()
         {
             ConnectViewModel cvm = new ConnectViewModel(winHelper);
         }
@@ -96,13 +96,36 @@ namespace Nils_Film_DB.ViewModel
         {
             get
             {
-                return new RelayCommand(param => OpenScan());
+                return new RelayCommand(param => openScan());
             }
         }
 
-        private void OpenScan()
+        private void openScan()
         {
             ScanViewModel svm = new ScanViewModel(winHelper);
+        }
+
+        // Get Online Data from https://www.themoviedb.org/
+        public ICommand Menu_TMDb
+        {
+            get
+            {
+                return new RelayCommand(param => openTMDb());
+            }
+        }
+
+        private void openTMDb()
+        {
+            List<string> columns = new List<string>();
+            List<string> values = new List<string>();
+            List<string> rcol = new List<string>();
+
+            columns.Add("_Synchro");
+            values.Add("0");
+            rcol.AddRange(new string[7]{"Nr","Titel","Originaltitel","Jahr","Land","Regisseur","Rating"});
+
+            DataTable dt = Data_model.GetTable("Filme", columns, values);
+            OnlineDataViewModel ovm = new OnlineDataViewModel(winHelper, dt);
         }
 
         // Exit
@@ -203,7 +226,7 @@ namespace Nils_Film_DB.ViewModel
                 if (chk.IsChecked)
                     search_users.Add(chk.Title);
             }
-            populate(Searchboxtext, search_options, search_users);
+            populate(Searchboxtext, search_options, search_users, ComboboxVersionsIsSelcted);
 
             // Remove Focus from Textbox to hide search options (maybe better to do in code behind)
             TraversalRequest request = new TraversalRequest(FocusNavigationDirection.Down);
@@ -220,6 +243,34 @@ namespace Nils_Film_DB.ViewModel
             SearchboxVisibility = val;
         }
 
+        // Combobox to switch between movie and version for 'not in collection of ...' search
+        private bool comboboxMoviesIsSelcted = true;
+        public bool ComboboxMoviesIsSelcted
+        {
+            get { return comboboxMoviesIsSelcted; }
+            set
+            {
+                if (value != comboboxMoviesIsSelcted)
+                {
+                    comboboxMoviesIsSelcted = value;
+                    OnPropertyChanged("ComboboxMoviesIsSelcted");
+                }
+            }
+        }
+
+        private bool comboboxVersionsIsSelcted;
+        public bool ComboboxVersionsIsSelcted
+        {
+            get { return comboboxVersionsIsSelcted; }
+            set
+            {
+                if (value != comboboxVersionsIsSelcted)
+                {
+                    comboboxVersionsIsSelcted = value;
+                    OnPropertyChanged("ComboboxVersionsIsSelcted");
+                }
+            }
+        }
 
         // Checkboxes for search options 
         private ObservableCollection<CheckBoxViewModel> searchColumnBoxes = new ObservableCollection<CheckBoxViewModel>();
@@ -236,45 +287,33 @@ namespace Nils_Film_DB.ViewModel
             set { searchUserBoxes = value; }
         }
 
-        // If user deletes a version of a movie, it is checked if there is another version in the database. If not, the movie is removed.
+        // If user deletes a version of a movie it is tried to remove it from the Versions and Movies tables as well. 
+        // If another user has the same version or another version of the movie exists, the foreign key constraints will prevent the deletion.
         private void deleteRow(object args)
         {
-            List<int> key = args as List<int>;
-            Data_model.DeleteRow(username, "V_Nr", key[0].ToString());
-            List<DataRow> dr = new List<DataRow>();
-            for (int i = 1; i < Tabs.Count(); ++i)
-            {
-                dr.AddRange(Tabs[i].Data.Select("Nr = " + key[1]));
-            }
-            if (dr.Count == 0)
-            {
-                dr.Clear();
-                dr.AddRange(Tabs[0].Data.Select("Nr = " + key[1]));
-                foreach (DataRow datr in dr)
-                    datr.Delete();
-                Data_model.DeleteRow("filme", "Nr", key[1].ToString());
-            }
+            DataRow drow = args as DataRow;
+            int key = Data_model.GetPrimaryKey(drow, "Versionen", "V_Nr");
+            Data_model.DeleteRow(username, "V_Nr", key.ToString());
+            string key2 = Data_model.GetValue("Versionen", "Nr", "V_Nr", key.ToString());
+            Data_model.DeleteRow("Versionen", "V_Nr", key.ToString());
+            Data_model.DeleteRow("Filme", "Nr", key2.ToString());
+            startSearch();
         }
 
         // Opens a dialouge to edit a row and transfer changes to database
         private void editRow(object args)
         {
             DataRow dr = (args as DataRowView).Row;
-            EditViewModel evm = new EditViewModel(winHelper, dr);
+            int pk = Data_model.GetPrimaryKey(dr, "Filme", "Nr");
+            EditViewModel evm = new EditViewModel(winHelper, dr, pk);
         }
 
         private void changeRow(object args)
         {
-            DataRow dr = args as DataRow;
-            Data_model.UpdateRow("filme", dr);
-            for (int i = 1; i < Tabs.Count(); ++i )
-            {
-                foreach (DataRow row in Tabs[i].Data.Select("Nr = " + dr.ItemArray[0]))
-                {
-                    row[2] = dr.ItemArray[1];
-                    Data_model.UpdateRow(Tabs[i].Data.TableName, row);
-                }
-            }
+            DataRow dr = (args as List<object>)[0] as DataRow;
+            int pk = Convert.ToInt16((args as List<object>)[1]);
+            Data_model.UpdateRow("filme", dr, pk);
+            startSearch();
         }
 
         // If save file exists, read login information from save file and starts setLogin to transmit login information to Datamodel
@@ -309,20 +348,20 @@ namespace Nils_Film_DB.ViewModel
         }
 
         // populate() gets data from the SQL-Server via the DataModel and fills the DataGrid by adding the DataTables to tabs
-        private void populate(string search = null, List<string> search_columns = null, List<string> search_user = null)
+        private void populate(string search = null, List<string> search_columns = null, List<string> search_user = null, bool versions = false)
         {
             tabs.Clear();
             SearchUserBoxes.Clear();
             SearchColumnBoxes.Clear();
             List<DataTable> tables = new List<DataTable>();
-            tables = Data_model.GetTables(search, search_columns, search_user);
+            tables = Data_model.GetTables(search, search_columns, search_user, versions);
             foreach (DataTable dt in tables)
             {
                 TabControlViewModel tvm = new TabControlViewModel(username, dt);
                 Tabs.Add(tvm);
 
                 // Add Checkboxes for User Search
-                if (dt.TableName != "filme")
+                if (dt.TableName.ToLower() != "filme")
                 {
                     CheckBoxViewModel chkbx = new CheckBoxViewModel(false);
                     chkbx.Title = dt.TableName;

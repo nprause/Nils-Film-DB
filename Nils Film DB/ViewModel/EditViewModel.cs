@@ -13,16 +13,21 @@ namespace Nils_Film_DB.ViewModel
     class EditViewModel : ViewModel
     {
         private DataRow dr;
+        int pk;
 
-        public EditViewModel(dynamic w, DataRow row)
+        public EditViewModel(dynamic w, DataRow row, int key)
         {
+            pk = key;
             winHelper = w;
             winID = winHelper.Open(this, -1, -1, false);
             dr = row;
-            for (int i=1; i<dr.ItemArray.Count(); ++i)
+            for (int i=0; i<dr.ItemArray.Count(); ++i)
             {
-                Titles.Add(dr.Table.Columns[i].ColumnName);           
-                Values.Add(new BindString(dr.ItemArray[i].ToString()));
+                if (dr.Table.Columns[i].ColumnName != "Hinzugefügt")
+                {
+                    Titles.Add(dr.Table.Columns[i].ColumnName);
+                    Values.Add(new BindString(dr.ItemArray[i].ToString()));
+                }
             }
         }
 
@@ -78,16 +83,22 @@ namespace Nils_Film_DB.ViewModel
         private void accept()
         {
             bool changed = false;
-            for (int i = 1; i < dr.ItemArray.Count(); ++i)
-            {             
-                if (dr.ItemArray[i].ToString() != Values[i - 1].Bsval)
+            for (int i = 0; i < dr.ItemArray.Count() - 1; ++i)
+            {
+                if (dr.Table.Columns[i].ColumnName != "Hinzugefügt")
                 {
-                    dr[i] = Values[i-1].Bsval;
-                    changed = true;
+                    if (dr.ItemArray[i].ToString() != Values[i].Bsval)
+                    {
+                        dr[i] = Values[i].Bsval;
+                        changed = true;
+                    }
                 }
             }
+            List<object> args = new List<object>();
+            args.Add(dr);
+            args.Add(pk);
             if (changed)
-                Mediator.NotifyColleagues("ChangeRow", dr);
+                Mediator.NotifyColleagues("ChangeRow", args);
             closeWindow();
         }
     }

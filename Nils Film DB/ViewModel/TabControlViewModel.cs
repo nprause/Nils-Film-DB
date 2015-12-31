@@ -83,7 +83,7 @@ namespace Nils_Film_DB.ViewModel
             if (param != null && Data.TableName.ToLower() == username.ToLower())
             {
                 DataRow dr = (param as DataRowView).Row;
-                Mediator.NotifyColleagues("DeleteRow", new List<int>(new int[]{Convert.ToInt16(dr.ItemArray[0]), Convert.ToInt16(dr.ItemArray[1])}));
+                Mediator.NotifyColleagues("DeleteRow", dr);
                 Data.Rows.Remove(dr);         
             }           
         }
