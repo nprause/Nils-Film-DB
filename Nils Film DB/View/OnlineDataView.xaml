@@ -29,7 +29,8 @@
         <!-- Buttons -->
         <StackPanel Grid.Column="1" Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" >  
             <Button Content="Abbrechen" Margin="2" Width="75" Command="{Binding ButtonCancel}" />
-            <Button Content="Start" Margin="2" Width="75" Command="{Binding ButtonStart}"/>
+            <Button Content="Start" Margin="2" Width="75" Command="{Binding ButtonStart}" IsEnabled="{Binding ButtonStartIsEnabled}"/>
+            <Button Content="Übernehmen" Margin="2" Width="75" Command="{Binding ButtonAccept}" IsEnabled="{Binding ButtonAcceptIsEnabled}"/>
         </StackPanel>
     </Grid>
 </UserControl>

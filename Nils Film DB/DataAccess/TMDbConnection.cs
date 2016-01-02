@@ -19,8 +19,8 @@ namespace Nils_Film_DB.DataAccess
                 httpClient.DefaultRequestHeaders.TryAddWithoutValidation("accept", "application/json");
                 string search;
                 if (year != null)
-                    search = "search/movie?api_key=" + api + "&include_adult=true&language=de&year=" + year + "&query=" + title;
-                else search = "search/movie?api_key=" + api + "&include_adult=true&language=de&query=" + title;
+                    search = "search/movie?api_key=" + api + "&include_adult=true&language=de&year=" + year + "&query='" + title + "'";
+                else search = "search/movie?api_key=" + api + "&include_adult=true&language=de&query='" + title + "'";
                 using (var response = await httpClient.GetAsync(search))
                 {
                     string responseData = await response.Content.ReadAsStringAsync();                 

@@ -10,17 +10,21 @@
             <RowDefinition Height="auto"/>
             <RowDefinition Height="auto"/>
             <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
         <TextBlock Text="{Binding DataRowText}"/>
-        <ListBox Grid.Row="1" ItemsSource="{Binding RButton}">
+        <ListBox Grid.Row="1" ItemsSource="{Binding RButton}" Margin="2">
             <ListBox.ItemTemplate >
                 <DataTemplate >
-                    <RadioButton GroupName="radioList" Content="{Binding Text}" IsChecked="{Binding IsChecked}" />
-                    <!-- <TextBlock Text="{Binding}"/> -->
-                </DataTemplate>
-            </ListBox.ItemTemplate>
+                    <RadioButton GroupName="radioList" Content="{Binding Text}" IsChecked="{Binding IsChecked}" Margin="2" />                 
+                </DataTemplate>              
+            </ListBox.ItemTemplate>            
         </ListBox>
-        <WrapPanel Grid.Row="2" HorizontalAlignment="Right">
+        <WrapPanel Grid.Row="2">
+            <RadioButton GroupName="radioList" Content="TMDb ID: " IsChecked="{Binding IsCheckedEnterID}" />
+            <TextBox Text="{Binding EnterID}" Margin="2" Width="200"/>
+        </WrapPanel>
+        <WrapPanel Grid.Row="3" HorizontalAlignment="Right">
             <Button Content="Abbrechen" Command="{Binding ButtonCancel}" Margin="2"/>
             <Button Content="Übernehmen" Command="{Binding ButtonAccept}" Margin="2" />
         </WrapPanel>

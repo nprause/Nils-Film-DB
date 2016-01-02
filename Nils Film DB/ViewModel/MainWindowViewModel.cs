@@ -58,7 +58,6 @@ namespace Nils_Film_DB.ViewModel
 
             // Check if Login information are stored locally       
             readLogin();
-          
         }
    
 
@@ -218,8 +217,20 @@ namespace Nils_Film_DB.ViewModel
             List<string> search_users = new List<string>();
             foreach (CheckBoxViewModel chk in SearchColumnBoxes)
             {
-                if (chk.IsChecked)            
-                    search_options.Add("Filme." + chk.Title);              
+                if (chk.IsChecked)
+                {
+                    if (chk.Title == "Titel")
+                    {
+                        search_options.Add("Filme.Titel");
+                        search_options.Add("Filme.Originaltitel");
+                        search_options.Add("Filme._Titel_alt");
+                    }
+                    else if (chk.Title == "Schauspieler")
+                    {
+                        search_options.Add("Filme._Cast");
+                    }
+                    else search_options.Add("Filme." + chk.Title);
+                }
             }
             foreach (CheckBoxViewModel chk in SearchUserBoxes)
             {
@@ -312,8 +323,8 @@ namespace Nils_Film_DB.ViewModel
         {
             DataRow dr = (args as List<object>)[0] as DataRow;
             int pk = Convert.ToInt16((args as List<object>)[1]);
-            Data_model.UpdateRow("filme", dr, pk);
-            startSearch();
+            Data_model.UpdateRow("Filme", dr, pk);
+            populate();
         }
 
         // If save file exists, read login information from save file and starts setLogin to transmit login information to Datamodel
@@ -372,13 +383,16 @@ namespace Nils_Film_DB.ViewModel
             // Add checkboxes for Column Search
             foreach (DataColumn dc in Tabs[0].Data.Columns)
             {
-                if (dc.ColumnName != "Nr")
+                if (dc.ColumnName != "Nr" && dc.ColumnName != "Originaltitel" && dc.ColumnName != "Hinzugefügt")
                 {
                     CheckBoxViewModel chkbx = new CheckBoxViewModel();
                     chkbx.Title = dc.ColumnName;
                     SearchColumnBoxes.Add(chkbx);
                 }
             }
+            CheckBoxViewModel chbx = new CheckBoxViewModel();
+            chbx.Title = "Schauspieler";
+            SearchColumnBoxes.Add(chbx);
         }
 
         // Add newly scanned data to Database and refresh the view with populate()

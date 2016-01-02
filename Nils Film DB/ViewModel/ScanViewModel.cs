@@ -299,16 +299,8 @@ namespace Nils_Film_DB.ViewModel
         private void bkw_DoWork(object sender, DoWorkEventArgs e)
         {
             // Get the BackgroundWorker that raised this event.
-            BackgroundWorker worker = sender as BackgroundWorker;
-            try
-            {
-                // Do the metadata scan              
-                tempScanResults = newscan.Deepscan(worker, e.Argument as List<string>);
-            }
-            catch (Exception ex)
-            {
-                MessageBoxViewModel mbox = new MessageBoxViewModel(winHelper, "Deepscan: " + ex.ToString());
-            }
+            BackgroundWorker worker = sender as BackgroundWorker;          
+            tempScanResults = newscan.Deepscan(worker, e.Argument as List<string>);          
         }
 
         // The ProgressChanged Event is called from the FileScan.Deepscan method and unpdates the progress bar
@@ -326,6 +318,7 @@ namespace Nils_Film_DB.ViewModel
             }
             else if (e.Error != null)
             {
+                MessageBoxViewModel mbox = new MessageBoxViewModel(winHelper, e.Error.ToString());
                 //resultLabel.Text = "Error: " + e.Error.Message;
             }
             else

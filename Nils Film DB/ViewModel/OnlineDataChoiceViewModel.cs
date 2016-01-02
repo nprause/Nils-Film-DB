@@ -43,7 +43,35 @@ namespace Nils_Film_DB.ViewModel
                 }
             }
         }
-      
+
+        private bool isCheckedEnterID;
+        public bool IsCheckedEnterID
+        {
+            get { return isCheckedEnterID; }
+            set
+            {
+                if (value != isCheckedEnterID)
+                {
+                    isCheckedEnterID = value;
+                    OnPropertyChanged("IsCheckedEnterID");
+                }
+            }
+        }
+
+        private string enterID;
+        public string EnterID
+        {
+            get { return enterID; }
+            set
+            {
+                if (value != enterID)
+                {
+                    enterID = value;
+                    OnPropertyChanged("EnterID");
+                }
+            }
+        }
+
         public OnlineDataChoiceViewModel (object w, List<string[]> movies, DataRow row)
         {
             winHelper = w;
@@ -51,18 +79,14 @@ namespace Nils_Film_DB.ViewModel
             dr = row;
             DataRowText = dr[1].ToString();
             DataRowText += " : " + dr[4].ToString() + " : " + dr[5].ToString();
-            try
+            if (movies != null)
             {
                 foreach (string[] str in movies)
                 {
-                    string text = str[0] + ": " + str[1] + ", " + str[2];
-                    RButton.Add(new RadioButton(text));                  
+                    string text = str[0] + ": " + str[2] + " (" + str[1] + ") [" + str[3] + "]";
+                    RButton.Add(new RadioButton(text));
                 }
-            }
-            catch(Exception e)
-            {
-                MessageBoxViewModel mb = new MessageBoxViewModel(winHelper, e.ToString());
-            }
+            }       
         }
 
         public ICommand ButtonCancel
@@ -90,13 +114,23 @@ namespace Nils_Film_DB.ViewModel
         {
             foreach (RadioButton b in RButton)
             {
+                List<object> retValues = new List<object>();
                 if (b.IsChecked == true)
-                {
-                    List<object> retValues = new List<object>();
+                {             
                     retValues.Add(b.Text.Remove(b.Text.IndexOf(":")));
                     retValues.Add(dr);
                     Mediator.NotifyColleagues("Choice", retValues);
                     CloseWindow();
+                }
+                if (IsCheckedEnterID == true)
+                {
+                    if (EnterID != "")
+                    {
+                        retValues.Add(EnterID);
+                        retValues.Add(dr);
+                        Mediator.NotifyColleagues("Choice", retValues);
+                        CloseWindow();
+                    }                                    
                 }
             }
         }

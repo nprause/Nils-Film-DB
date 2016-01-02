@@ -182,7 +182,7 @@ namespace Nils_Film_DB
         // Here the real work is done. All files in List<string> files are checked for video streams with MediaInfo. 
         // If they are videos the filenames are analysed for metadata with the reg expression string. If successfull, deeper metadata are retrieved using again MediaInfo.
         public DataTable Deepscan(BackgroundWorker worker, List<string> fileList)
-        {
+        {          
             // If a list of files is given as argument, the local list is overridden
             if (fileList != null)
                 files = fileList;

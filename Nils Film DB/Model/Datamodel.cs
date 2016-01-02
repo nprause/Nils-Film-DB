@@ -11,7 +11,7 @@ namespace Nils_Film_DB.Model
 {
     class Datamodel
     {
-
+       
         //
         // The DataModel is a bridge between the SQL Server and the MainWindowViewModel. It does not hold any data but provides methods for data access.
         //
@@ -62,12 +62,12 @@ namespace Nils_Film_DB.Model
                     }
                 }
 
-                // Check if Tables "filme", "versionen" and "[username]" are in the DataBase. If not, they are created. 
+                // Check if Tables "Filme", "Versionen" and "[username]" are in the DataBase. If not, they are created. 
                 // This is done by just trying to create the Table and ignoring errors that would arise when the tables are already present.
                 // Naming Convention: Column names that begin with an '_' are not shown in the apllication main window. They can however be used in searches and may be added later. 
                 try
                 {
-                    MyConn.Execute("CREATE TABLE Filme (Nr INTEGER NOT NULL AUTO_INCREMENT, Titel VARCHAR (100), Originaltitel VARCHAR (100), _Titel_alt VARCHAR (255), Jahr VARCHAR (4), Land VARCHAR (40), Regisseur VARCHAR (40), _Cast VARCHAR (255), Genre VARCHAR (255), Rating DECIMAL (2,1), _TMDb_Id VARCHAR (10), _IMDB_Id VARCHAR (10), _Poster VARCHAR (20), Hinzugefügt DATE, _Synchro BOOL DEFAULT FALSE, PRIMARY KEY (Nr));");
+                    MyConn.Execute("CREATE TABLE Filme (Nr INTEGER NOT NULL AUTO_INCREMENT, Titel VARCHAR (100), Originaltitel VARCHAR (100), _Titel_alt TEXT, Jahr VARCHAR (4), Land VARCHAR (40), Regisseur VARCHAR (255), _Cast TEXT, Genre VARCHAR (255), Rating VARCHAR (10), _TMDb_Id VARCHAR (10), _IMDB_Id VARCHAR (10), _Poster VARCHAR (40), Hinzugefügt DATE, _Synchro BOOL DEFAULT FALSE, PRIMARY KEY (Nr));");
                 }
                 catch
                 { }
@@ -101,7 +101,7 @@ namespace Nils_Film_DB.Model
 
             DataTable db = MyConn.GetSchema("Tables");
 
-            // The colums of the "filme" and the "versionen" tables are retrieved from the database.
+            // The colums of the "Filme" and the "Versionen" tables are retrieved from the database.
             // The tablenames of the user tables are stored in table_names.
             List<string> table_names = new List<string>();
             table_names.Add("Filme");
@@ -109,12 +109,12 @@ namespace Nils_Film_DB.Model
             db = MyConn.GetSchema("Columns");
             foreach (DataRow dr in db.Rows)
             {
-                if (dr[2].ToString() == "filme")
+                if (dr[2].ToString().ToLower() == "filme" )
                 {
                     if (!dr[3].ToString().Contains("Nr") && dr[3].ToString()[0] != '_')
                         columns_movies += "Filme." + dr[3] + ", ";
                 }
-                else if (dr[2].ToString() == "versionen")
+                else if (dr[2].ToString().ToLower() == "versionen")
                 {
                     if (!dr[3].ToString().Contains("Nr") && dr[3].ToString()[0] != '_')
                         columns_versions += "Versionen." + dr[3] + ", ";
@@ -462,7 +462,11 @@ namespace Nils_Film_DB.Model
             {
                 if (dr.Table.Columns[i].ColumnName != "Hinzugefügt")
                 {
-                    if (dr[i].ToString() != "")
+                    if (dr.Table.Columns[i].ColumnName == "_Synchro")
+                    {
+                        cmd += dr.Table.Columns[i].ColumnName + "=" + dr[i] + ",";
+                    }
+                    else if (dr[i].ToString() != "")               
                     {
                         cmd += dr.Table.Columns[i].ColumnName + "=@param" + i + ",";
                         parameter.Add("@param" + i);
