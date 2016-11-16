@@ -39,12 +39,12 @@ namespace Nils_Film_DB.DataAccess
 
         private string connstring()
         {
-            return "server=" + server + ";userid=" + username + ";password=" + SecureStringConverter.SecureStringToString(password) + ";database=" + database;
+            return "server=" + server + ";userid=" + username + ";password=" + SecureStringConverter.SecureStringToString(password) + ";database=" + database + ";Convert Zero Datetime=True";
         }
 
         // Login info can be given directly or as List<objects>. 
         // This method also test whether a connection can be established and retruns the result as bool. 
-        public bool SetLoginInfo(string serv, string un, SecureString pw, string db)
+        public string SetLoginInfo(string serv, string un, SecureString pw, string db)
         {
             server = serv;
             username = un;
@@ -56,11 +56,31 @@ namespace Nils_Film_DB.DataAccess
                 connection.Open();
                 connection.Close();
                 connection.ConnectionString = "";
-                return true;
+                return null;
             }
-            catch
+            catch (Exception e)
             {
-                return false;
+                return e.ToString();
+            }
+        }
+
+        public string SetLoginInfo(List<object> login)
+        {
+            server = login[0] as string;
+            username = login[1] as string;
+            password = login[2] as SecureString;
+            database = login[3] as string;
+            try
+            {
+                connection.ConnectionString = connstring();
+                connection.Open();
+                connection.Close();
+                connection.ConnectionString = null;
+                return null;
+            }
+            catch (Exception e)
+            {
+                return e.ToString();
             }
         }
 
@@ -85,25 +105,6 @@ namespace Nils_Film_DB.DataAccess
             connection.ConnectionString = null;
         }
 
-        public bool SetLoginInfo(List<object> login)
-        {
-            server = login[0] as string;
-            username = login[1] as string;
-            password = login[2] as SecureString;
-            database = login[3] as string;
-            try
-            {
-                connection.ConnectionString = connstring();
-                connection.Open();
-                connection.Close();
-                connection.ConnectionString = null;
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
 
         // Return the Schema sc_name for the Database
         public DataTable GetSchema(string sc_name)
@@ -136,8 +137,28 @@ namespace Nils_Film_DB.DataAccess
                 command.ExecuteNonQuery();
                 return true;
             }
-            catch
+            catch (Exception e)
             {
+                MessageBox.Show(e.ToString());
+                return false;
+            }
+        }
+
+        // Execute NonQuery SQL Command single parameter version
+        public bool Execute(string comm, string parameter, string parameterValue)
+        {
+            command.CommandText = comm;
+            command.Parameters.Clear();
+            command.Parameters.AddWithValue(parameter, parameterValue);
+            command.Connection = connection;
+            try
+            {
+                command.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.ToString());
                 return false;
             }
         }
@@ -173,3 +194,5 @@ namespace Nils_Film_DB.DataAccess
 
     }
 }
+
+//SELECT DISTINCT CONCAT(m.title, ' (', DATE_FORMAT(m.release_date, '%Y'), ')') AS 'Titel', v.resolution 'Auflösung', v.type 'Typ', v.codec 'Codec', v.audio 'Audio', v.length 'Länge', v.size 'Größe', v.ending 'Endung', DATE_FORMAT(v.added, '%e.%m.%Y') 'Hinzugefügt' FROM movies m LEFT JOIN (SELECT movie_id, GROUP_CONCAT(name SEPARATOR ', ') 'name' FROM directors JOIN crew USING (crew_id)) d ON d.movie_id = m.movie_id LEFT JOIN(SELECT movie_id, name  FROM actors JOIN crew USING(crew_id)) a ON a.movie_id = m.movie_id JOIN versions v ON m.movie_id = v.movie_id JOIN collection c ON v.version_id = c.version_id WHERE c.user_name = 'nils' m.movie_id NOT IN (SELECT m.movie_id FROM movies m JOIN versions v USING (movie_id) JOIN collection c USING (version_id) JOIN users u USING (user_name) WHERE user_name IN ( 'nils')) ORDER BY Titel"

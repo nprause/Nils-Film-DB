@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using Nils_Film_DB.DataAccess;
 
@@ -25,11 +23,10 @@ namespace Nils_Film_DB.Model
         }
 
         // The name of the Database
-        private string db_name = "film_db";
+        private string db_name = "movie_db";
 
         // Name of current user and an numerical id that represents which table in DataBase is connected to the user
         private string username;
-        private int userID;
 
         // Adds the name of tha database to the login information and transmits it to the MySQLConnection instance. 
         // Additionally the DataBase structure is created if not yet present.
@@ -37,197 +34,285 @@ namespace Nils_Film_DB.Model
         {
             username = login[1] as string;
             login.Add(db_name);
-            bool connection = MyConn.SetLoginInfo(login);
+            string connection = MyConn.SetLoginInfo(login);
 
-            if (connection)
-            {
-                MyConn.Open();
-                // Check if a DataBase with the name db_name is present on MyConn. If not, it is created.
-                DataTable db = MyConn.GetSchema("DataBases");
-                bool exists = false;
-                foreach (DataRow row in db.Rows)
-                {
-                    if (row.ItemArray[1].ToString() == db_name)
-                        exists = true;
-                }
-                if (!exists)
-                {
-                    try
-                    {
-                        MyConn.Execute("CREATE DATABASE " + db_name);
-                    }
-                    catch (Exception e)
-                    {
-                        MessageBox.Show("Datenbank " + db_name + " ist nicht vorhanden und konnte nicht erstellt werden.\n" + e.ToString());
-                    }
-                }
-
-                // Check if Tables "Filme", "Versionen" and "[username]" are in the DataBase. If not, they are created. 
-                // This is done by just trying to create the Table and ignoring errors that would arise when the tables are already present.
-                // Naming Convention: Column names that begin with an '_' are not shown in the apllication main window. They can however be used in searches and may be added later. 
-                try
-                {
-                    MyConn.Execute("CREATE TABLE Filme (Nr INTEGER NOT NULL AUTO_INCREMENT, Titel VARCHAR (100), Originaltitel VARCHAR (100), _Titel_alt TEXT, Jahr VARCHAR (4), Land VARCHAR (40), Regisseur VARCHAR (255), _Cast TEXT, Genre VARCHAR (255), Rating VARCHAR (10), _TMDb_Id VARCHAR (10), _IMDB_Id VARCHAR (10), _Poster VARCHAR (40), Hinzugefügt DATE, _Synchro BOOL DEFAULT FALSE, PRIMARY KEY (Nr));");
-                }
-                catch
-                { }
-                try
-                {
-                    MyConn.Execute("CREATE TABLE Versionen (V_Nr INTEGER NOT NULL AUTO_INCREMENT, Nr INTEGER, Auflösung VARCHAR (20), Typ VARCHAR (40), Codec VARCHAR (40), Audio VARCHAR (100), Länge VARCHAR (20), Dateigröße VARCHAR (20), Dateiendung VARCHAR (20), Hinzugefügt DATE, PRIMARY KEY (V_Nr), FOREIGN KEY (Nr) REFERENCES Filme (Nr));");
-                }
-                catch
-                { }
-                try
-                {
-                    MyConn.Execute("CREATE TABLE " + username + " (U_Nr INTEGER NOT NULL AUTO_INCREMENT, V_Nr INTEGER, PRIMARY KEY (U_Nr), FOREIGN KEY (V_Nr) REFERENCES Versionen (V_Nr));");
-                }
-                catch
-                { }
-                MyConn.Close();
+            if (connection == null)
+            {            
                 return username + ": Verbunden zu " + login[0] as string;
             }
-            else return "Verbindungsfehler";
+            else return connection;
         }
 
 
-        // Returns a list of DataTables containing the data on the SQL Server MyConn. Without an argument all data is returned.
+        // Returns the table Movies and all user Tables on the SQL Server MyConn. Without an argument all data is returned.
         // Alternatively a search string with list of columns to be searched and a list of tables which content is not to be shown can be given
         public List<DataTable> GetTables(string search = null, List<string> search_columns = null, List<string> tab_exclude = null, bool versions = false)
         {
             List<DataTable> tables = new List<DataTable>();
             if (tab_exclude == null)
                 tab_exclude = new List<string>();
+
             MyConn.Open();
-
-            DataTable db = MyConn.GetSchema("Tables");
-
-            // The colums of the "Filme" and the "Versionen" tables are retrieved from the database.
-            // The tablenames of the user tables are stored in table_names.
-            List<string> table_names = new List<string>();
-            table_names.Add("Filme");
-            string columns_movies = "", columns_versions = "";
-            db = MyConn.GetSchema("Columns");
-            foreach (DataRow dr in db.Rows)
+            string cmd = "SELECT DISTINCT m.title 'Titel', "
+                         + "m.original_title 'Originaltitel', "
+                         + "d.name 'Regisseur', "
+                         + "DATE_FORMAT(m.release_date, '%m/%Y') 'Release', "
+                         + "m.country 'Land', "
+                         + "m.genre 'Genre', "
+                         + "m.rating 'Rating', "
+                         + "DATE_FORMAT(m.added, '%e.%m.%Y') 'Hinzugefügt' "
+                         + "FROM movies m "
+                         + "LEFT JOIN (SELECT movie_id, GROUP_CONCAT(name SEPARATOR ', ') 'name' FROM directors JOIN crew USING (crew_id) GROUP BY movie_id) d "
+                         + "ON d.movie_id = m.movie_id "
+                         + "LEFT JOIN(SELECT movie_id, name FROM actors JOIN crew USING(crew_id)) a "
+                         + "ON a.movie_id = m.movie_id "
+                         + "JOIN versions v "
+                         + "ON m.movie_id = v.movie_id "
+                         + "JOIN collection c "
+                         + "ON c.version_id = v.version_id "
+                         + "JOIN users u "
+                         + "ON c.user_name = u.user_name ";
+            string cmd_search = "";
+            if (search != null && search != "" && search_columns.Count() > 0)
             {
-                if (dr[2].ToString().ToLower() == "filme" )
+                cmd_search += "WHERE ";
+                for (int i = 0; i <= search_columns.Count() - 1; ++i)
                 {
-                    if (!dr[3].ToString().Contains("Nr") && dr[3].ToString()[0] != '_')
-                        columns_movies += "Filme." + dr[3] + ", ";
+                    cmd_search += search_columns[i] + " LIKE @suche OR ";
                 }
-                else if (dr[2].ToString().ToLower() == "versionen")
-                {
-                    if (!dr[3].ToString().Contains("Nr") && dr[3].ToString()[0] != '_')
-                        columns_versions += "Versionen." + dr[3] + ", ";
-                }
-                else if (!table_names.Contains(dr[2].ToString()))
-                {
-                    table_names.Add(dr[2].ToString());
-                    if (dr[2].ToString() == username.ToLower())
-                        userID = table_names.Count() - 1;
-                }
+                cmd_search = cmd_search.Substring(0, cmd_search.LastIndexOf("OR"));
             }
-            columns_movies = columns_movies.Remove(columns_movies.LastIndexOf(","));
-            columns_versions = columns_versions.Remove(columns_versions.LastIndexOf(","));
-            string cmd;
-
-            // The data is retrieved from the server
-            foreach (string tab in table_names)
+            cmd += cmd_search;
+            string tabs = "";
+            if (tab_exclude.Count() > 0)
             {
-                // This SQL Command returns all data on the database for the current table.
-                if (tab == "Filme")
-                    cmd = "SELECT DISTINCT " + columns_movies + " FROM (";
+                foreach (string tab in tab_exclude)
+                {
+                    tabs += "'" + tab + "', ";
+                }
+                tabs = tabs.Remove(tabs.LastIndexOf(","));
+                if (cmd_search != "")
+                    cmd += "AND ";
                 else
-                    cmd = "SELECT DISTINCT Titel, " + columns_versions + " FROM ((";
+                    cmd += "WHERE ";
+                cmd += "m.movie_id NOT IN ( "
+                    + "SELECT m.movie_id FROM "
+                    + "movies m JOIN versions v "
+                    + "USING (movie_id) "
+                    + "JOIN collection c "
+                    + "USING (version_id) "
+                    + "JOIN users u "
+                    + "USING (user_name) "
+                    + "WHERE user_name IN ( ";
+                cmd += tabs + ")) ";
+            }
+            cmd += "ORDER BY Titel";
 
-                foreach (string table in tab_exclude)
-                {
-                    if (table != tab)
-                        cmd += "(";
-                }
-                cmd += tab;
+            DataTable dt = new DataTable();
+            List<string> parameter = new List<string>();
+            List<string> parameterValue = new List<string>();
+            parameter.Add("@suche");
+            parameterValue.Add("%" + search + "%");
+            dt = MyConn.GetData(cmd, parameter, parameterValue);
+            dt.TableName = "Filme";
+            tables.Add(dt);
 
-                if (tab == "Filme")
-                {
-                    cmd += " JOIN Versionen ON Versionen.Nr=Filme.Nr)";
-                }
-                if (tab != "Filme")
-                {
-                    cmd += " JOIN Versionen ON Versionen.V_Nr=" + tab + ".V_Nr) JOIN Filme ON Filme.Nr=Versionen.Nr)";
-                }
+            cmd = "SELECT DISTINCT user_name FROM users JOIN collection USING (user_name)";
+            dt = MyConn.GetData(cmd);
+            List<string> users = new List<string>();
 
-                // If movies or versions from certain collections are to be excluded
-                if (tab_exclude.Count() > 0)
-                {
-                    if (versions)
-                    {
-                        foreach (string table in tab_exclude)
-                        {
-                            if (table != tab)
-                                cmd += " LEFT JOIN " + table + " ON Versionen.V_Nr=" + table + ".V_Nr)";
-                        }
-               
-                            cmd += " WHERE (";
-                            foreach (string table in tab_exclude)
-                            {
-                                cmd += table + ".V_Nr IS NULL AND ";
-                            }
-                            cmd = cmd.Remove(cmd.LastIndexOf("AND"));
-                            cmd += ")";
-                        
-                    }             
-                    else
-                    {
-                        if (tab == "Filme")
-                        {
-                            cmd = "SELECT " +  columns_movies + " FROM Filme";
-                            foreach (string table in tab_exclude)
-                                cmd += " LEFT JOIN (" + table + " JOIN Versionen AS " + table + "_vers ON " + table + ".V_Nr=" + table + "_vers.V_Nr) ON Filme.Nr=" + table + "_vers.Nr";
-                            cmd += " WHERE (";
-                            foreach (string table in tab_exclude)
-                                cmd += table + "_vers.Nr IS NULL AND ";
-                            cmd = cmd.Remove(cmd.LastIndexOf("AND"));
-                            cmd += ")";
-                        }
+            foreach (DataRow dr in dt.Rows)
+                users.Add(dr[0].ToString());
 
-                        else
-                        {
-                            cmd = "SELECT DISTINCT Titel, " + columns_versions + " FROM (Filme JOIN Versionen ON (Filme.Nr=Versionen.Nr) LEFT JOIN " + tab + " ON (" + tab + ".V_Nr=Versionen.V_Nr)) WHERE (" + tab + ".U_Nr IS NOT NULL";
-                            foreach (string table in tab_exclude)
-                                cmd += " AND Versionen.Nr NOT IN (SELECT Filme.Nr FROM Filme JOIN Versionen ON Filme.Nr=Versionen.Nr JOIN " + table + " ON " + table + ".V_Nr=Versionen.V_Nr)";
-                            cmd += ")";
-
-                        }
-                    }
-                }
-                
-                // If search options are specified the command is extended accordingly.
+            foreach (string user in users)
+            {
+                cmd = "SELECT DISTINCT CONCAT(m.title, ' (', DATE_FORMAT(m.release_date, '%Y'), ')') AS 'Titel', "
+                        + "v.resolution 'Auflösung', "
+                        + "v.type 'Typ', "
+                        + "v.codec 'Codec', "
+                        + "v.audio 'Audio', "
+                        + "v.length 'Länge', "
+                        + "v.size 'Größe', "
+                        + "v.ending 'Endung', "
+                        + "DATE_FORMAT(v.added, '%e.%m.%Y') 'Hinzugefügt' "
+                        + "FROM movies m "
+                        + "LEFT JOIN (SELECT movie_id, name FROM directors JOIN crew USING (crew_id)) d "
+                        + "ON d.movie_id = m.movie_id "
+                        + "LEFT JOIN(SELECT movie_id, name  FROM actors JOIN crew USING(crew_id)) a "
+                        + "ON a.movie_id = m.movie_id "
+                        + "JOIN versions v "
+                        + "ON m.movie_id = v.movie_id "
+                        + "JOIN collection c "
+                        + "ON v.version_id = c.version_id "
+                        + "WHERE c.user_name = '";
+                cmd += user + "' ";
+                cmd_search = "";
                 if (search != null && search != "" && search_columns.Count() > 0)
-                {
-                    if (tab_exclude.Count() > 0)
-                        cmd += " AND (";
-                    else
-                        cmd += " WHERE (";
-
+                {                 
                     for (int i = 0; i <= search_columns.Count() - 1; ++i)
                     {
-                        cmd += search_columns[i] + " LIKE @suche OR ";
+                        cmd_search += search_columns[i] + " LIKE @suche OR ";
                     }
-                    cmd = cmd.Substring(0, cmd.LastIndexOf("OR")) + ")";
+                    cmd_search = cmd_search.Substring(0, cmd_search.LastIndexOf("OR"));
+                    cmd += "AND " + cmd_search;
                 }
 
+                if (tab_exclude.Count() > 0)
+                {
+                    cmd += " AND m.movie_id NOT IN ("
+                        + "SELECT m.movie_id FROM "
+                        + "movies m JOIN versions v "
+                        + "USING (movie_id) "
+                        + "JOIN collection c "
+                        + "USING (version_id) "
+                        + "JOIN users u "
+                        + "USING (user_name) "
+                        + "WHERE user_name IN ( ";
+                    cmd += tabs + ")) ";
+                }
+                cmd += "ORDER BY Titel";
 
-                // Data is retrieved from MySQL Server and added to List
-                DataTable dt = new DataTable();
-                List<string> parameter = new List<string>();
-                List<string> parameterValue = new List<string>();
+                parameter = new List<string>();
+                parameterValue = new List<string>();
                 parameter.Add("@suche");
                 parameterValue.Add("%" + search + "%");
                 dt = MyConn.GetData(cmd, parameter, parameterValue);
-                dt.TableName = tab;
+                dt.TableName = user;
                 tables.Add(dt);
-
             }
-            MyConn.Close();
+
+
+                /*
+                DataTable db = MyConn.GetSchema("Tables");
+
+                // The colums of the "Filme" and the "Versionen" tables are retrieved from the database.
+                // The tablenames of the user tables are stored in table_names.
+                List<string> table_names = new List<string>();
+                table_names.Add("Filme");
+                string columns_movies = "", columns_versions = "";
+                db = MyConn.GetSchema("Columns");
+                foreach (DataRow dr in db.Rows)
+                {
+                    if (dr[2].ToString().ToLower() == "filme" )
+                    {
+                        if (!dr[3].ToString().Contains("Nr") && dr[3].ToString()[0] != '_')
+                            columns_movies += "Filme." + dr[3] + ", ";
+                    }
+                    else if (dr[2].ToString().ToLower() == "versionen")
+                    {
+                        if (!dr[3].ToString().Contains("Nr") && dr[3].ToString()[0] != '_')
+                            columns_versions += "Versionen." + dr[3] + ", ";
+                    }
+                    else if (!table_names.Contains(dr[2].ToString()))
+                    {
+                        table_names.Add(dr[2].ToString());
+                        if (dr[2].ToString() == username.ToLower())
+                            userID = table_names.Count() - 1;
+                    }
+                }
+                columns_movies = columns_movies.Remove(columns_movies.LastIndexOf(","));
+                columns_versions = columns_versions.Remove(columns_versions.LastIndexOf(","));
+                string cmd;
+
+                // The data is retrieved from the server
+                foreach (string tab in table_names)
+                {
+                    // This SQL Command returns all data on the database for the current table.
+                    if (tab == "Filme")
+                        cmd = "SELECT DISTINCT " + columns_movies + " FROM (";
+                    else
+                        cmd = "SELECT DISTINCT Titel, " + columns_versions + " FROM ((";
+
+                    foreach (string table in tab_exclude)
+                    {
+                        if (table != tab)
+                            cmd += "(";
+                    }
+                    cmd += tab;
+
+                    if (tab == "Filme")
+                    {
+                        cmd += " JOIN Versionen ON Versionen.Nr=Filme.Nr)";
+                    }
+                    if (tab != "Filme")
+                    {
+                        cmd += " JOIN Versionen ON Versionen.V_Nr=" + tab + ".V_Nr) JOIN Filme ON Filme.Nr=Versionen.Nr)";
+                    }
+
+                    // If movies or versions from certain collections are to be excluded
+                    if (tab_exclude.Count() > 0)
+                    {
+                        if (versions)
+                        {
+                            foreach (string table in tab_exclude)
+                            {
+                                if (table != tab)
+                                    cmd += " LEFT JOIN " + table + " ON Versionen.V_Nr=" + table + ".V_Nr)";
+                            }
+
+                                cmd += " WHERE (";
+                                foreach (string table in tab_exclude)
+                                {
+                                    cmd += table + ".V_Nr IS NULL AND ";
+                                }
+                                cmd = cmd.Remove(cmd.LastIndexOf("AND"));
+                                cmd += ")";
+
+                        }             
+                        else
+                        {
+                            if (tab == "Filme")
+                            {
+                                cmd = "SELECT " +  columns_movies + " FROM Filme";
+                                foreach (string table in tab_exclude)
+                                    cmd += " LEFT JOIN (" + table + " JOIN Versionen AS " + table + "_vers ON " + table + ".V_Nr=" + table + "_vers.V_Nr) ON Filme.Nr=" + table + "_vers.Nr";
+                                cmd += " WHERE (";
+                                foreach (string table in tab_exclude)
+                                    cmd += table + "_vers.Nr IS NULL AND ";
+                                cmd = cmd.Remove(cmd.LastIndexOf("AND"));
+                                cmd += ")";
+                            }
+
+                            else
+                            {
+                                cmd = "SELECT DISTINCT Titel, " + columns_versions + " FROM (Filme JOIN Versionen ON (Filme.Nr=Versionen.Nr) LEFT JOIN " + tab + " ON (" + tab + ".V_Nr=Versionen.V_Nr)) WHERE (" + tab + ".U_Nr IS NOT NULL";
+                                foreach (string table in tab_exclude)
+                                    cmd += " AND Versionen.Nr NOT IN (SELECT Filme.Nr FROM Filme JOIN Versionen ON Filme.Nr=Versionen.Nr JOIN " + table + " ON " + table + ".V_Nr=Versionen.V_Nr)";
+                                cmd += ")";
+
+                            }
+                        }
+                    }
+
+                    // If search options are specified the command is extended accordingly.
+                    if (search != null && search != "" && search_columns.Count() > 0)
+                    {
+                        if (tab_exclude.Count() > 0)
+                            cmd += " AND (";
+                        else
+                            cmd += " WHERE (";
+
+                        for (int i = 0; i <= search_columns.Count() - 1; ++i)
+                        {
+                            cmd += search_columns[i] + " LIKE @suche OR ";
+                        }
+                        cmd = cmd.Substring(0, cmd.LastIndexOf("OR")) + ")";
+                    }
+
+
+                    // Data is retrieved from MySQL Server and added to List
+                    DataTable dt = new DataTable();
+                    List<string> parameter = new List<string>();
+                    List<string> parameterValue = new List<string>();
+                    parameter.Add("@suche");
+                    parameterValue.Add("%" + search + "%");
+                    dt = MyConn.GetData(cmd, parameter, parameterValue);
+                    dt.TableName = tab;
+                    tables.Add(dt);
+
+                }
+                */
+                MyConn.Close();
             return tables;
         }
 
@@ -266,17 +351,96 @@ namespace Nils_Film_DB.Model
             return result;
         }
 
+        public DataTable Get_movies_full()
+        {
+            MyConn.Open();
+            string cmd = "SELECT DISTINCT m.movie_id, "
+                         + "m.title, "
+                         + "m.original_title, "
+                         + "DATE_FORMAT(m.release_date, '%m/%Y') 'release_date', "
+                         + "m.country, "
+                         + "d.name 'directors', "                                        
+                         + "m.genre, "
+                         + "m.rating, "
+                         + "m.tmdb_id, "
+                         + "m.imdb_id, "
+                         + "m.poster_path, "                  
+                         + "m.alternative_titles, "
+                         + "a.name 'actors', "
+                         + "m.tmdb_synchro "
+                         + "FROM movies m "
+                         + "LEFT JOIN (SELECT movie_id, GROUP_CONCAT(name SEPARATOR ', ') 'name' FROM directors JOIN crew USING (crew_id) GROUP BY movie_id) d "
+                         + "ON d.movie_id = m.movie_id "
+                         + "LEFT JOIN (SELECT movie_id, GROUP_CONCAT(name SEPARATOR ', ') 'name' FROM actors JOIN crew USING (crew_id)) a "
+                         + "ON a.movie_id = m.movie_id "
+                         + "JOIN versions v "
+                         + "ON m.movie_id = v.movie_id "
+                         + "JOIN collection c "
+                         + "ON c.version_id = v.version_id "
+                         + "JOIN users u "
+                         + "ON c.user_name = u.user_name ";
+            DataTable result = MyConn.GetData(cmd);
+            MyConn.Close();
+            return result;
+        }
+
+        public DataTable Get_versions_user()
+        {
+            MyConn.Open();
+            string cmd = "SELECT v.version_id, "
+                    + "v.movie_id, "
+                    + "v.resolution, "
+                    + "v.type, "
+                    + "v.codec, "
+                    + "v.audio, "
+                    + "v.length, "
+                    + "v.size, "
+                    + "v.ending, "
+                    + "DATE_FORMAT(v.added, '%e.%m.%Y') "
+                    + "FROM movies m JOIN versions v "
+                    + "ON m.movie_id = v.movie_id "
+                    + "JOIN collection c "
+                    + "ON v.version_id = c.version_id "
+                    + "WHERE c.user_name = '";
+            cmd += username + "'";
+            DataTable result = MyConn.GetData(cmd);
+            MyConn.Close();
+            return result;
+        }
+
+        public DataTable Get_versions()
+        {
+            MyConn.Open();
+            string cmd = "SELECT v.version_id, "
+                    + "v.movie_id, "
+                    + "v.resolution, "
+                    + "v.type, "
+                    + "v.codec, "
+                    + "v.audio, "
+                    + "v.length, "
+                    + "v.size, "
+                    + "v.ending, "
+                    + "DATE_FORMAT(v.added, '%e.%m.%Y')"
+                    + "FROM movies m JOIN versions v "
+                    + "ON m.movie_id = v.movie_id "
+                    + "JOIN collection c "
+                    + "ON v.version_id = c.version_id";
+            DataTable result = MyConn.GetData(cmd);
+            MyConn.Close();
+            return result;
+        }
+
         public void AddData(DataTable newdata)
         {
             try
-            {            
+            {        
                 MyConn.Open();
                 // Get data from database               
-                DataTable movies = MyConn.GetData("SELECT * FROM Filme");
-                DataTable versions = MyConn.GetData("SELECT * FROM Versionen");
+                DataTable movies = MyConn.GetData("SELECT * FROM movies");
+                DataTable versions = MyConn.GetData("SELECT * FROM versions");             
 
                 // Lock Database    
-                MyConn.Execute("LOCK TABLES Filme WRITE, " + username.ToLower() + " WRITE");
+                //MyConn.Execute("LOCK TABLES movies WRITE, versions WRITE, collection WRITE");
 
                 string command;
                 int id;
@@ -286,9 +450,11 @@ namespace Nils_Film_DB.Model
                 // To prevent this, the MySQL connector provides the Parameters property, which masks everything that could be misinterpreted as an SQL statement.
                 List<string> parameter = new List<string>();
                 parameter.Add("@title");
-                parameter.Add("@original");
-                parameter.Add("@year");
+                parameter.Add("@original_title");
+                parameter.Add("@release_date");
                 parameter.Add("@country");
+                parameter.Add("@genre");
+                parameter.Add("@rating");
                 parameter.Add("@res");
                 parameter.Add("@type");
                 parameter.Add("@codec");
@@ -296,113 +462,200 @@ namespace Nils_Film_DB.Model
                 parameter.Add("@length");
                 parameter.Add("@size");
                 parameter.Add("@ending");
+                parameter.Add("@tmdb_id");
+                parameter.Add("@imdb_id");
+                parameter.Add("@poster_path");
+                parameter.Add("@alternative_titles");
+                parameter.Add("@tmdb_synchro");
 
-                // All SQL commands are transmitted in a TRANSACTION block. That increases the speed drastically. 
-                MyConn.Execute("START TRANSACTION");
-
+                // All SQL commands are transmitted in a TRANSACTION block. This increases the speed drastically. 
+                MyConn.Execute("START TRANSACTION");            
                 // Loop through all movies in newdata and add them to database if not already there.
                 for (int i = 0; i < newdata.Rows.Count; ++i)
                 {
-                    string titel = @newdata.Rows[i][0].ToString();
-                    string jahr = @newdata.Rows[i][2].ToString();
+                    if ((int)(newdata.Rows[i][20]) == 1)
+                    {
+                        if (Convert.ToInt32(newdata.Rows[i][0]) < 0)
+                        {
+                            string title = @newdata.Rows[i][1].ToString();
+                            DateTime year = DateTime.Parse(newdata.Rows[i][3].ToString());
 
-                    //Checking if movies are already in Database. This is done locally. A movie is consiered unique by title and year. 
-                    DataRow[] duplikate;
-                    DataView dw = new DataView(movies);
-                    dw.Sort = "Titel";
-                    duplikate = movies.Select("Titel = '" + titel.Replace("'", "''") + "' AND Jahr = '" + jahr.Replace("'", "''") + "'");
+                            //Checking if movies are already in Database. This is done locally. A movie is consiered unique by title and year. 
+                            DataRow[] duplikate;
+                            DataView dw = new DataView(movies);
+                            dw.Sort = "title";
+                            duplikate = movies.Select("title = '" + title.Replace("'", "''") + "' AND release_date = '" + year + "'");
 
-                    // Assigning parameters
-                    List<string> parameterValue = new List<string>();
-                    parameterValue.Add(newdata.Rows[i][0].ToString());
-                    parameterValue.Add(newdata.Rows[i][1].ToString());
-                    parameterValue.Add(newdata.Rows[i][2].ToString());
-                    parameterValue.Add(newdata.Rows[i][3].ToString());
-                    parameterValue.Add(newdata.Rows[i][4].ToString());
-                    parameterValue.Add(newdata.Rows[i][5].ToString());
-                    parameterValue.Add(newdata.Rows[i][6].ToString());
-                    parameterValue.Add(newdata.Rows[i][7].ToString());
-                    parameterValue.Add(newdata.Rows[i][8].ToString());
-                    parameterValue.Add(newdata.Rows[i][9].ToString());
-                    parameterValue.Add(newdata.Rows[i][10].ToString());
+                            // Assigning parameters
+                            List<string> parameterValue = new List<string>();
+                            for (int j = 0; j < newdata.Columns.Count; ++j)
+                            {
+                                if (j != 0 && j != 3 && j != 5 && j != 19)
+                                    parameterValue.Add(newdata.Rows[i][j].ToString());
+                                else if (j == 3)
+                                    parameterValue.Add(Convert.ToDateTime(newdata.Rows[i][j]).ToString("dd.MM.yyyy"));
+                            }
 
-                    // Splitting the scan data into one row for the general movie information and one for the user data
-                    DataRow dr_movie = movies.NewRow();
-                    dr_movie["Titel"] = newdata.Rows[i]["Titel"];
-                    dr_movie["Originaltitel"] = newdata.Rows[i]["Originaltitel"];
-                    dr_movie["Jahr"] = newdata.Rows[i]["Jahr"];
-                    dr_movie["Land"] = newdata.Rows[i]["Land"];
+                            // Splitting the scan data into one row for the general movie information and one for the user data
+                            DataRow dr_movie = movies.NewRow();
+                            dr_movie["title"] = newdata.Rows[i]["title"];
+                            dr_movie["original_title"] = newdata.Rows[i]["original_title"];
+                            dr_movie["release_date"] = DateTime.Parse(newdata.Rows[i]["release_date"].ToString());
+                            dr_movie["country"] = newdata.Rows[i]["country"];
+                            dr_movie["genre"] = newdata.Rows[i]["genre"];
+                            dr_movie["rating"] = newdata.Rows[i]["rating"];
+                            dr_movie["tmdb_id"] = newdata.Rows[i]["tmdb_id"];
+                            dr_movie["imdb_id"] = newdata.Rows[i]["imdb_id"];
+                            dr_movie["poster_path"] = newdata.Rows[i]["poster_path"];
+                            dr_movie["alternative_titles"] = newdata.Rows[i]["alternative_titles"];
+                            dr_movie["tmdb_synchro"] = newdata.Rows[i]["tmdb_synchro"];
 
-                    DataRow dr_version = versions.NewRow();
-                    dr_version["Auflösung"] = newdata.Rows[i]["Auflösung"];
-                    dr_version["Typ"] = newdata.Rows[i]["Typ"];
-                    dr_version["Codec"] = newdata.Rows[i]["Codec"];
-                    dr_version["Audio"] = newdata.Rows[i]["Audio"];
-                    dr_version["Länge"] = newdata.Rows[i]["Länge"];
-                    dr_version["Dateigröße"] = newdata.Rows[i]["Dateigröße"];
-                    dr_version["Dateiendung"] = newdata.Rows[i]["Dateiendung"];
+                            DataRow dr_version = versions.NewRow();
+                            dr_version["resolution"] = newdata.Rows[i]["resolution"];
+                            dr_version["type"] = newdata.Rows[i]["type"];
+                            dr_version["codec"] = newdata.Rows[i]["codec"];
+                            dr_version["audio"] = newdata.Rows[i]["audio"];
+                            dr_version["length"] = newdata.Rows[i]["length"];
+                            dr_version["size"] = newdata.Rows[i]["size"];
+                            dr_version["ending"] = newdata.Rows[i]["ending"];
+                            // If movie is not yet in Database it is included. Else it is checked if the user already has this version of the movie in the database.
+                            if (duplikate.Length == 0)
+                            {
+                                command = "INSERT INTO movies VALUES (null , @title, @original_title, alternative_titles, STR_TO_DATE(@release_date, '%d.%m.%Y'), @country, @genre, @rating, @tmdb_id, @imdb_id, @poster_path, null, 1);";
+                                MyConn.Execute(command, parameter, parameterValue);
+                                id = MyConn.GetLastId();
+                                dr_movie["movie_id"] = id;
+                                // Check if actors/directors of movie are in database. Yes -> Get crew Id. No -> Add to crew and get crew id. 
+                                string cmd = "SELECT crew_id, name FROM crew WHERE name IN (";
+                                if (newdata.Rows[i]["actors"].ToString() != "")
+                                {
+                                    List<string> actors = new List<string>(newdata.Rows[i]["actors"].ToString().Replace(", ", ",").Replace("'", "''").Split(','));
+                                    List<string> par_actors = new List<string>();
+                                    for (int j = 0; j < actors.Count; ++j)
+                                    {
+                                        par_actors.Add("@act_" + j.ToString());
+                                        cmd += "@act_" + j.ToString() + ", ";
+                                    }
+                                    cmd = cmd.Remove(cmd.LastIndexOf(','));
+                                    cmd += ")";
+                                    DataTable actor_id = MyConn.GetData(cmd, par_actors, actors);
+
+                                    foreach (string actor in actors)
+                                    {
+                                        int act_id = -1;
+                                        foreach (DataRow actor_id_row in actor_id.Rows)
+                                        {
+                                            if (actor_id_row[1].ToString() == actor)
+                                                act_id = Convert.ToInt16(actor_id_row.ItemArray[0]);
+                                        }
+                                        if (act_id > -1)
+                                        {
+                                            cmd = "INSERT INTO actors (movie_id, crew_id) VALUES (" + id + ", '" + act_id + "')";
+                                            MyConn.Execute(cmd);
+                                        }
+                                        else
+                                        {
+                                            cmd = "INSERT INTO crew (name) VALUES ('" + @actor + "')";
+                                            MyConn.Execute(cmd, "@actor", actor);
+                                            act_id = MyConn.GetLastId();
+                                            cmd = "INSERT INTO actors (movie_id, crew_id) VALUES (" + id + ", " + act_id + ")";
+                                            MyConn.Execute(cmd);
+                                        }
+                                    }
+                                }
+                                if (newdata.Rows[i]["directors"].ToString() != "")
+                                {
+                                    List<string> directors = new List<string>(newdata.Rows[i]["directors"].ToString().Replace(", ", ",").Replace("'", "''").Split(','));
+                                    List<string> par_directors = new List<string>();
+                                    cmd = "SELECT crew_id, name FROM crew WHERE name IN (";
+                                    for (int j = 0; j < directors.Count; ++j)
+                                    {
+                                        par_directors.Add("@dir_" + j.ToString());
+                                        cmd += "@dir_" + j.ToString() + ", ";
+                                    }
+                                    cmd = cmd.Remove(cmd.LastIndexOf(','));
+                                    cmd += ")";
+                                    DataTable director_id = MyConn.GetData(cmd, par_directors, directors);
+
+                                    foreach (string director in directors)
+                                    {
+                                        int dir_id = -1;
+                                        foreach (DataRow director_id_row in director_id.Rows)
+                                        {
+                                            if (director_id_row[1].ToString() == director)
+                                                dir_id = Convert.ToInt16(director_id_row.ItemArray[0]);
+                                        }
+                                        if (dir_id > -1)
+                                        {
+                                            cmd = "INSERT INTO directors (movie_id, crew_id) VALUES (" + id + ", '" + dir_id + "')";
+                                            MyConn.Execute(cmd);
+                                        }
+                                        else
+                                        {
+                                            cmd = "INSERT INTO crew (name) VALUES ('" + @director + "')";
+                                            MyConn.Execute(cmd, "@director", director);
+                                            dir_id = MyConn.GetLastId();
+                                            cmd = "INSERT INTO directors (movie_id, crew_id) VALUES (" + id + ", " + dir_id + ")";
+                                            MyConn.Execute(cmd);
+                                        }
+                                    }
+                                }
+                                command = "INSERT INTO versions VALUES (null," + id +
+                                        ", @res, @type, @codec, @audio, @length, @size, @ending, null);";
+                                MyConn.Execute(command, parameter, parameterValue);
+                                id = MyConn.GetLastId();
+                                dr_version["version_id"] = id;
+
+                                command = "INSERT INTO collection VALUES ('" + username.ToLower() + "', " + id + "); ";
+                                MyConn.Execute(command, parameter, parameterValue);
+
+                                // Also add to olddata to prevent another insertion of the same movie
+                                movies.Rows.Add(dr_movie);
+                                versions.Rows.Add(dr_version);
+                            }
+                            // Movie is already in the database. Check if version is in database and if user already has it.
+                            else
+                            {
+                                // Get the primary key of the movie
+                                int fk = Convert.ToInt32(duplikate[0][0]);
+                                string res = newdata.Rows[i][8].ToString();
+                                string codec = newdata.Rows[i][10].ToString();
+                                string length = newdata.Rows[i][12].ToString();
+                                string size = newdata.Rows[i][13].ToString();
+                                // Check for this version of movie. It is consiered unique by resolution, codec, length and size.
+                                DataView dw2 = new DataView(versions);
+                                dw2.Sort = "size";
+                                duplikate = versions.Select("size = '" + size + "' AND resolution = '" + res + "' AND codec = '" + codec + "' AND length = '" + length + "'");
+
+                                if (duplikate.Length == 0)
+                                {
+                                    command = "INSERT INTO versions VALUES (null," + fk +
+                                        ", @res, @type, @codec, @audio, @length, @size, @ending, null);";
+                                    MyConn.Execute(command, parameter, parameterValue);
+                                    id = MyConn.GetLastId();
+                                    dr_version["version_id"] = id;
+
+                                    command = "INSERT INTO collection VALUES ('" + username.ToLower() + "', " + id + "); ";
+                                    MyConn.Execute(command, parameter, parameterValue);
+
+                                    // also add to olddata to prevent another insertion of this version
+                                    versions.Rows.Add(dr_version);
+                                }
+                                else
+                                {
+                                    fk = Convert.ToInt32(duplikate[0][0]);
+                                    //command = "INSERT INTO collection VALUES '" + username.ToLower() + "', (SELECT * FROM (SELECT (" + fk + ")) AS tmp WHERE NOT EXISTS (SELECT version_id FROM collection WHERE version_id=" + fk + "));";
+                                    command = "INSERT INTO collection SELECT '" + username.ToLower() + "', " + fk + " FROM DUAL WHERE NOT EXISTS (SELECT version_id FROM collection WHERE version_id = " + fk + ")";
+                                    MyConn.Execute(command, parameter, parameterValue);
+                                }
+                            }
+                        }
+                    }
                     
-                    // If movie is not yet in Database it is included. Else it is checked if the user already has this version of the movie in the database.
-                    if (duplikate.Length == 0)
-                    {
-                        command = "INSERT INTO Filme VALUES (null , @title, @original, null, @year, @country, null, null, null, null, null, null, null, CURDATE(), FALSE);";
-                        MyConn.Execute(command, parameter, parameterValue);
-                        id = MyConn.GetLastId();
-                        dr_movie["Nr"] = id;
-
-                        command = "INSERT INTO Versionen VALUES (null," + id +
-                                ", @res, @type, @codec, @audio, @length, @size, @ending, CURDATE());";
-                        MyConn.Execute(command, parameter, parameterValue);
-                        id = MyConn.GetLastId();
-                        dr_version["V_Nr"] = id;
-
-                        command = "INSERT INTO " + username.ToLower() + " VALUES (null," + id + ");";
-                        MyConn.Execute(command, parameter, parameterValue);
-
-                        // Also add to olddata to prevent another insertion of the same movie
-                        movies.Rows.Add(dr_movie);
-                        versions.Rows.Add(dr_version);
-                    }
-                    // Movie is already in the database. Check if version is in database and if user already has it.
-                    else
-                    {
-                        // Get the primary key of the movie
-                        int fk = Convert.ToInt32(duplikate[0][0]);
-                        string res = newdata.Rows[i][4].ToString();
-                        string codec = newdata.Rows[i][6].ToString();
-                        string length = newdata.Rows[i][8].ToString();
-                        string size = newdata.Rows[i][9].ToString();
-
-                        // Check for this version of movie. It is consiered unique by resolution, codec, length and size.
-                        DataView dw2 = new DataView(versions);
-                        dw2.Sort = "Dateigröße";
-                        duplikate = versions.Select("Dateigröße = '" + size + "' AND Auflösung = '" + res + "' AND Codec = '" + codec + "' AND Länge = '" + length + "'");
-
-                        if (duplikate.Length == 0)
-                        {
-                            command = "INSERT INTO Versionen VALUES (null, " + fk +
-                                ", @res, @type, @codec, @audio, @length, @size, @ending, CURDATE());";
-                            MyConn.Execute(command, parameter, parameterValue);
-                            id = MyConn.GetLastId();
-                            dr_version["V_Nr"] = id;
-
-                            command = "INSERT INTO " + username.ToLower() + " VALUES (null," + id + ");";
-                            MyConn.Execute(command, parameter, parameterValue);
-
-                            // also add to olddata to prevent another insertion of this version
-                            versions.Rows.Add(dr_version);
-                        }
-                        else
-                        {
-                            fk = Convert.ToInt32(duplikate[0][0]);
-                            command = "INSERT INTO " + username.ToLower() + " (V_Nr) (SELECT * FROM (SELECT (" + fk + ")) AS tmp WHERE NOT EXISTS (SELECT V_Nr FROM " + username.ToLower() + " WHERE V_Nr=" + fk + "));";
-                            MyConn.Execute(command, parameter, parameterValue);
-                        }
-                    }
                 }
-                // Commit SQL commands and unlock Tables
+                // Commit SQL commands and unlock Tables                 
+                //MyConn.Execute("UNLOCK TABLES");
                 MyConn.Execute("COMMIT");
-                MyConn.Execute("UNLOCK TABLES");
             }
             catch (Exception ex)
             {

@@ -25,9 +25,10 @@
         <DataTemplate DataType="{x:Type vm:MessageBoxViewModel}">
             <vw:MessageBoxView />
         </DataTemplate>
+        <!--
         <DataTemplate DataType="{x:Type vm:OnlineDataChoiceViewModel}">
             <vw:OnlineDataChoiceView />
-        </DataTemplate>
+        </DataTemplate> -->
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </Application.Resources>
 </Application>

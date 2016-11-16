@@ -89,6 +89,26 @@ namespace Nils_Film_DB.ViewModel
             }       
         }
 
+        public OnlineDataChoiceViewModel(List<string[]> movies, DataRow row)
+        {          
+            dr = row;
+            if (dr[1].ToString() != null)
+            {
+                DataRowText = dr[1].ToString();
+                DataRowText += " : " + dr[3].ToString() + " : " + dr[5].ToString();
+            }
+            else
+                DataRowText = dr[11].ToString();
+            if (movies != null)
+            {
+                foreach (string[] str in movies)
+                {
+                    string text = str[0] + ": " + str[2] + " (" + str[1] + ") [" + str[3] + "]";
+                    RButton.Add(new RadioButton(text));
+                }
+            }
+        }
+
         public ICommand ButtonCancel
         {
             get
@@ -99,7 +119,10 @@ namespace Nils_Film_DB.ViewModel
 
         private void CloseWindow()
         {
-            winHelper.Close(winID);
+            if (winID > 0)
+                winHelper.Close(winID);
+            else
+                Mediator.NotifyColleagues("Choice_scan_drop", this);
         }
 
         public ICommand ButtonAccept
@@ -112,29 +135,31 @@ namespace Nils_Film_DB.ViewModel
 
         private void accept()
         {
+            List<object> retValues = new List<object>();
             foreach (RadioButton b in RButton)
             {
-                List<object> retValues = new List<object>();
+               
                 if (b.IsChecked == true)
-                {             
+                {
                     retValues.Add(b.Text.Remove(b.Text.IndexOf(":")));
                     retValues.Add(dr);
-                    Mediator.NotifyColleagues("Choice", retValues);
                     CloseWindow();
+                    Mediator.NotifyColleagues("Choice", retValues);
+
                 }
+            }
                 if (IsCheckedEnterID == true)
                 {
                     if (EnterID != "")
                     {
                         retValues.Add(EnterID);
                         retValues.Add(dr);
-                        Mediator.NotifyColleagues("Choice", retValues);
                         CloseWindow();
+                        Mediator.NotifyColleagues("Choice", retValues);                     
+                        
                     }                                    
                 }
-            }
-        }
-
+            }      
     }
 
     class RadioButton : ViewModel

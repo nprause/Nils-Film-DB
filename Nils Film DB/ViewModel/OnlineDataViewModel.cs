@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Net;
 using Nils_Film_DB.Helper;
 using Nils_Film_DB.DataAccess;
 
@@ -12,7 +13,21 @@ namespace Nils_Film_DB.ViewModel
 {
     class OnlineDataViewModel : ViewModel
     {
-        TMDbConnection TMDb = new TMDbConnection();    
+        TMDbConnection TMDb = new TMDbConnection();
+
+        // Constructor
+        public OnlineDataViewModel(WindowHelper w, DataTable dt)
+        {
+            Data = dt;
+            winHelper = w;
+            winID = winHelper.Open(this, 600, 400);
+            Mediator.Register("Choice", returnChoice);
+        }
+
+        private IPAddress get_ip()
+        {
+            return IPAddress.Parse("127.0.0.1");
+        }
 
         // TextBox for the API key
         private string apiKey;
@@ -73,15 +88,6 @@ namespace Nils_Film_DB.ViewModel
             }
         }
 
-        // Constructor
-        public OnlineDataViewModel(WindowHelper w, DataTable dt)
-        {
-            Data = dt;
-            winHelper = w;
-            winID = winHelper.Open(this, 600, 400);
-            Mediator.Register("Choice", returnChoice);
-        }
-
         //Button Commands
         public ICommand ButtonCancel
         {
@@ -116,7 +122,7 @@ namespace Nils_Film_DB.ViewModel
         {
             foreach (DataRow dr in Data.Rows)
             {
-                if ( Convert.ToBoolean(dr["_Synchro"]) == true)
+                if ( Convert.ToBoolean(dr["tmdb_synchro"]) == true)
                 {
                     List<object> args = new List<object>();
                     args.Add(dr);
@@ -154,13 +160,13 @@ namespace Nils_Film_DB.ViewModel
                    year = null;
                }
                string res;
-               while ((res = await TMDb.Search(ApiKey, title, year)).Contains("Your request count"))
+               while ((res = await TMDb.Search(get_ip(), ApiKey, title, year)).Contains("Your request count"))
                {
                    System.Threading.Thread.Sleep(2000);
                }
                if (res.Contains("\"total_results\":0"))
                {
-                   while ((res = await TMDb.Search(ApiKey, o_title, year)).Contains("Your request count"))
+                   while ((res = await TMDb.Search(get_ip(),ApiKey, o_title, year)).Contains("Your request count"))
                    {
                        System.Threading.Thread.Sleep(2000);
                    }
@@ -218,7 +224,7 @@ namespace Nils_Film_DB.ViewModel
         async void populate(DataRow dr, string id)
         {
             string details;
-            while ((details = await TMDb.MovieDetail(id, ApiKey)).Contains("Your request count"))
+            while ((details = await TMDb.MovieDetail(get_ip(), id, ApiKey)).Contains("Your request count"))
             {
                 System.Threading.Thread.Sleep(2000);
             }
@@ -229,19 +235,19 @@ namespace Nils_Film_DB.ViewModel
                 dts = parseDetails(details);
 
                 if (dts[6] != null)
-                    dr["Titel"] = dts[6];
-                dr["Originaltitel"] = dts[2];
-                dr["_Titel_alt"] = dts[8];
-                dr["Jahr"] = dts[5].Remove(4);
-                dr["Land"] = dts[4];
-                dr["Regisseur"] = dts[10];
-                dr["Genre"] = dts[0];
-                dr["_Cast"] = dts[9];
-                dr["Rating"] = Convert.ToDecimal(dts[7]) / 10;
-                dr["_TMDb_Id"] = id;
-                dr["_IMDB_Id"] = dts[1];
-                dr["_Poster"] = dts[3];
-                dr["_Synchro"] = true;
+                    dr["title"] = dts[6];
+                    dr["original_title"] = dts[2];
+                    dr["alternative_titles"] = dts[8];
+                    dr["release_date"] = dts[5];
+                    dr["country"] = dts[4];
+                    //dr["director"] = dts[10];
+                    dr["genre"] = dts[0];
+                    //dr["actor"] = dts[9];
+                    dr["rating"] = Convert.ToDecimal(dts[7]) / 10;
+                    dr["tmdb_id"] = id;
+                    dr["imdb_id"] = dts[1];
+                    dr["poster_path"] = dts[3];
+                    dr["tmdb_synchro"] = true;
             }
             else
             {

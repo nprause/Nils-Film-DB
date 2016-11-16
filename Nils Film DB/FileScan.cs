@@ -4,10 +4,9 @@ using System.ComponentModel;
 using System.Data;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
 using MediaInfoLib;
+using System.Windows;
+using Nils_Film_DB.Helper;
 
 namespace Nils_Film_DB
 {
@@ -31,6 +30,13 @@ namespace Nils_Film_DB
         public int NumberSuccess
         { get { return numberSuccess; } }
 
+        private int numberSort = 0;
+        public int NumberSort
+        {
+            get { return numberSort; }
+            set { numberSort = value; }
+        }
+
         // List of files in the path tree
         private List<string> files = new List<string>();
 
@@ -48,7 +54,7 @@ namespace Nils_Film_DB
         private List<string> regList = new List<string>();
 
         // DataTable to store metadata for video files
-        private DataTable metadata = new DataTable();
+        public DataTable metadata = new DataTable();
 
         // Array contains valid %-expressions
         private static readonly string[] validRegs = { "%name", "%orig", "%jahr", "%land", "%igno" };
@@ -56,18 +62,19 @@ namespace Nils_Film_DB
         // Constructor:
         // Columns for DataTable metadata are created
         public Filescan()
-        {                  
-            metadata.Columns.Add("Titel", typeof(string));
-            metadata.Columns.Add("Originaltitel", typeof(string));
-            metadata.Columns.Add("Jahr", typeof(string));
-            metadata.Columns.Add("Land", typeof(string));
-            metadata.Columns.Add("Auflösung", typeof(string));
-            metadata.Columns.Add("Typ", typeof(string));
-            metadata.Columns.Add("Codec", typeof(string));
-            metadata.Columns.Add("Audio", typeof(string));
-            metadata.Columns.Add("Länge", typeof(string));
-            metadata.Columns.Add("Dateigröße", typeof(string));
-            metadata.Columns.Add("Dateiendung", typeof(string));           
+        {
+            metadata.Columns.Add("title", typeof(string));
+            metadata.Columns.Add("original_title", typeof(string));
+            metadata.Columns.Add("release_date", typeof(string));
+            metadata.Columns.Add("country", typeof(string));
+            metadata.Columns.Add("resolution", typeof(string));
+            metadata.Columns.Add("type", typeof(string));
+            metadata.Columns.Add("codec", typeof(string));
+            metadata.Columns.Add("audio", typeof(string));
+            metadata.Columns.Add("length", typeof(string));
+            metadata.Columns.Add("size", typeof(string));
+            metadata.Columns.Add("ending", typeof(string));
+            metadata.Columns.Add("file", typeof(string));
         }
 
         // An instance of the MediaInfo class is created, which contains methods to obtain metadata of media files.
@@ -75,21 +82,32 @@ namespace Nils_Film_DB
 
         // An initial scan of the path tree. The private method fastcan is recalled recursively to loop through all subdirectories. File names are stored in List<string> files.
         // The number of total files is returned to update the UI and set the maximum of the progress bar.
-        public int Fastscan(string path)
+        public List<string> Fastscan(string path)
         {
             if (Directory.Exists(path))
             {
                 files.Clear();
                 numberFiles = 0;
                 fastscan(path);
-                return numberFiles;
+                //return numberFiles;
+                return files;
             }
             else
-                return -1;
+                //return -1;
+                return null;
         }
-      
+
+        // Reset information about already scanned files for a fresh scan.
+        public void Reset()
+        {
+            failures.Clear();
+            successes.Clear();
+            numberVideos = 0;
+            numberSuccess = 0;
+        }
+
         public void fastscan(string path)
-        {          
+        {
             DirectoryInfo film_dir = new DirectoryInfo(path);
             foreach (DirectoryInfo subdir in film_dir.GetDirectories())
             {
@@ -103,86 +121,92 @@ namespace Nils_Film_DB
             {
                 files.Add(fileInfo.FullName);
                 ++numberFiles;
-            }       
+            }
         }
+
+
 
 
         // Analyses the user given reg expression string and adds each part to List<string> regList. 
         // If there is an error in the expression, a corresponding error message is returned.
         public string RegEval(string reg)
         {
-            regList.Clear();
-
-            // Check if the number of '?' is even. Return error message if not.
-            int quest_count = 0;
-            foreach (char ch in reg)
-                if (ch == '?') ++quest_count;
-            if (quest_count % 2 != 0)
-                return "Regulärer Audruck Fehlerhaft. Gerade Anzahl an '?' benutzen.";
-
-            // Remove "??". Two joining optional blocks are combined to one.
-            int i;
-            while ( ( i = reg.IndexOf("??")) != -1)
-                reg = reg.Remove(i,2);
-    
-            // Loop through the reg expression. Every '?' or '%****' and the seperators between them are added to List<string> regList.
-            // There always has to be a spereator between two %-expressions.
-            int new_index, last_index = -1;
-            do
+            if (reg != "")
             {
-                new_index = reg.IndexOfAny(new char[] { '%', '?' }, last_index + 1);
-                if (new_index != -1) // IndexOfAny returns -1 when the char is not found
+                regList.Clear();
+
+                // Check if the number of '?' is even. Return error message if not.
+                int quest_count = 0;
+                foreach (char ch in reg)
+                    if (ch == '?') ++quest_count;
+                if (quest_count % 2 != 0)
+                    return "Regulärer Audruck Fehlerhaft. Gerade Anzahl an '?' benutzen.";
+
+                // Remove "??". Two joining optional blocks are combined to one.
+                int i;
+                while ((i = reg.IndexOf("??")) != -1)
+                    reg = reg.Remove(i, 2);
+
+                // Loop through the reg expression. Every '?' or '%****' and the seperators between them are added to List<string> regList.
+                // There always has to be a spereator between two %-expressions.
+                int new_index, last_index = -1;
+                do
                 {
-                    if (reg[new_index] == '?')
+                    new_index = reg.IndexOfAny(new char[] { '%', '?' }, last_index + 1);
+                    if (new_index != -1) // IndexOfAny returns -1 when the char is not found
                     {
-                        if (new_index > last_index + 1)
-                            regList.Add(reg.Substring(last_index + 1, new_index - last_index - 1));
-                        regList.Add("?");
-                        last_index = new_index;
-                    }
-                    else
-                    {
-                        // Check if %-expression comes directly after another %-expression. Only necessary when new_index > 4                       
-                        if ((new_index <= 4) || ((new_index > 4) && (reg[new_index - 5] != '%')))
+                        if (reg[new_index] == '?')
                         {
-                            // Check if %-expression comes directly after a '?' that follow a %-expression. Only necessary when new_index > 5
-                            if ((new_index <= 5) || ((new_index > 5) && (reg[new_index - 1] != '?')) || ((new_index > 5) && (reg[new_index - 1] == '?') && (reg[new_index - 6] != '%')))
-                            {
-                                // Check if %-expression is in the list of valid expressions.
-                                if (validRegs.Contains(reg.Substring(new_index, 5)))
-                                {
-                                    // If this is not the first entry of regList, the expression before this is added to regList.
-                                    if (new_index > 0)
-                                        regList.Add(reg.Substring(last_index + 1, new_index - last_index - 1));
-                                    regList.Add(reg.Substring(new_index, 5));
-                                    last_index = new_index + 4;
-                                }
-                                else
-                                    return ("Ausdruck " + (reg.Substring(new_index, 5)) + " ungültig.");
-                            }
-                            else
-                                return "Zwei %-Ausdrücke können nicht nur durch ein ? getrennt sein";
+                            if (new_index > last_index + 1)
+                                regList.Add(reg.Substring(last_index + 1, new_index - last_index - 1));
+                            regList.Add("?");
+                            last_index = new_index;
                         }
                         else
-                            return "Zwei %-Ausdrücke direkt nacheinander sind nicht gültig.";
+                        {
+                            // Check if %-expression comes directly after another %-expression. Only necessary when new_index > 4                       
+                            if ((new_index <= 4) || ((new_index > 4) && (reg[new_index - 5] != '%')))
+                            {
+                                // Check if %-expression comes directly after a '?' that follow a %-expression. Only necessary when new_index > 5
+                                if ((new_index <= 5) || ((new_index > 5) && (reg[new_index - 1] != '?')) || ((new_index > 5) && (reg[new_index - 1] == '?') && (reg[new_index - 6] != '%')))
+                                {
+                                    // Check if %-expression is in the list of valid expressions.
+                                    if (validRegs.Contains(reg.Substring(new_index, 5)))
+                                    {
+                                        // If this is not the first entry of regList, the expression before this is added to regList.
+                                        if (new_index > 0)
+                                            regList.Add(reg.Substring(last_index + 1, new_index - last_index - 1));
+                                        regList.Add(reg.Substring(new_index, 5));
+                                        last_index = new_index + 4;
+                                    }
+                                    else
+                                        return ("Ausdruck " + (reg.Substring(new_index, 5)) + " ungültig.");
+                                }
+                                else
+                                    return "Zwei %-Ausdrücke können nicht nur durch ein ? getrennt sein";
+                            }
+                            else
+                                return "Zwei %-Ausdrücke direkt nacheinander sind nicht gültig.";
+                        }
                     }
                 }
-            }
-            while (new_index != -1 && last_index <= reg.Length);
+                while (new_index != -1 && last_index <= reg.Length);
 
-            // Add the rest of the reg expression to the list
-            if (last_index < reg.Length - 1)
-            {
-                regList.Add(reg.Substring(last_index + 1));
+                // Add the rest of the reg expression to the list
+                if (last_index < reg.Length - 1)
+                {
+                    regList.Add(reg.Substring(last_index + 1));
+                }
+                return null;
             }
-            return null;
+            else return null;
         }
 
 
         // Here the real work is done. All files in List<string> files are checked for video streams with MediaInfo. 
         // If they are videos the filenames are analysed for metadata with the reg expression string. If successfull, deeper metadata are retrieved using again MediaInfo.
         public DataTable Deepscan(BackgroundWorker worker, List<string> fileList)
-        {          
+        {
             // If a list of files is given as argument, the local list is overridden
             if (fileList != null)
                 files = fileList;
@@ -198,12 +222,12 @@ namespace Nils_Film_DB
             for (int i = 0; i < files.Count(); ++i)
             {
                 string file = files[i];
-                worker.ReportProgress(i);               
+                //worker.ReportProgress(i);               
                 med_info.Open(file);
                 if (med_info.Count_Get(StreamKind.Video) > 0)
                 {
                     ++numberVideos;
-                    meta_reg = obtainMeta(file.Substring(file.LastIndexOf("\\") + 1, file.LastIndexOf(".") - file.LastIndexOf("\\") -1 ));
+                    meta_reg = obtainMeta(file.Substring(file.LastIndexOf("\\") + 1, file.LastIndexOf(".") - file.LastIndexOf("\\") - 1));
                     if (meta_reg != null)
                     {
                         ++numberSuccess;
@@ -212,7 +236,7 @@ namespace Nils_Film_DB
                         string type = med_info.Get(StreamKind.Video, 0, "Format");
                         string res = med_info.Get(StreamKind.Video, 0, "Width") + " x " + med_info.Get(StreamKind.Video, 0, "Height");
                         string size = med_info.Get(0, 0, "FileSize");
-                        string length = med_info.Get(StreamKind.Video, 0, "Duration");                      
+                        string length = med_info.Get(StreamKind.Video, 0, "Duration");
                         string audio = "";
                         for (int j = 0; j < Convert.ToInt32(med_info.Get(StreamKind.Audio, 0, "StreamCount")); ++j)
                         {
@@ -221,6 +245,7 @@ namespace Nils_Film_DB
                                 audio += ", ";
                         }
                         metadata.Rows.Add(meta_reg[0], meta_reg[1], meta_reg[2], meta_reg[3], res, type, codec, audio, length, size, file.Substring(file.LastIndexOf('.') + 1));
+
                     }
                     else
                     {
@@ -231,6 +256,54 @@ namespace Nils_Film_DB
             return metadata;
         }
 
+        public DataRow Deepscan(string file)
+        {
+            // Reset file information
+            //failures.Clear();
+            //successes.Clear();
+            metadata.Rows.Clear();
+            //numberVideos = 0;
+            //numberSuccess = 0;
+            DataRow dr = metadata.NewRow();
+            List<string> meta_reg;
+            //string file = arg as string;
+            //worker.ReportProgress(i);               
+            med_info.Open(file);
+            if (med_info.Count_Get(StreamKind.Video) > 0)
+            {
+                ++numberVideos;
+                meta_reg = new List<string>();
+                if (regList.Count > 0)
+                    meta_reg = obtainMeta(file.Substring(file.LastIndexOf("\\") + 1, file.LastIndexOf(".") - file.LastIndexOf("\\") - 1));
+                
+                successes.Add(file);
+                if (meta_reg.Count() > 0) ++numberSuccess;
+
+                string codec = med_info.Get(StreamKind.Video, 0, "CodecID");
+                string type = med_info.Get(StreamKind.Video, 0, "Format");
+                string res = med_info.Get(StreamKind.Video, 0, "Width") + " x " + med_info.Get(StreamKind.Video, 0, "Height");
+                string size = med_info.Get(0, 0, "FileSize");
+                string length = med_info.Get(StreamKind.Video, 0, "Duration");
+                string audio = "";
+                for (int j = 0; j < Convert.ToInt32(med_info.Get(StreamKind.Audio, 0, "StreamCount")); ++j)
+                {
+                    audio += med_info.Get(StreamKind.Audio, j, "Language") + " (" + med_info.Get(StreamKind.Audio, j, "Codec") + ")";
+                    if (j < Convert.ToInt16(med_info.Get(StreamKind.Audio, 0, "StreamCount")) - 1)
+                        audio += ", ";
+                }
+
+                for (int i = 0; i < 4; ++i)
+                {
+                    if (meta_reg.Count > 0)
+                        dr[i] = meta_reg[i];
+                    else
+                        dr[i] = "";
+                }
+                dr[4] = res; dr[5] = type; dr[6] = codec; dr[7] = audio; dr[8] = length; dr[9] = size; dr[10] = file.Substring(file.LastIndexOf('.') + 1); dr[11] = file;
+                return dr; 
+            }
+            return null;
+        }
 
         // A filename is scanned for metadata using the expressions in regList. 
         // Regular expression consists of %-expressions, seperators and '?'
@@ -239,14 +312,14 @@ namespace Nils_Film_DB
         private List<string> obtainMeta(string filename)
         {
             // meta[0] : name;  meta[1] : orig; meta[2] : jahr; meta[3] : land;
-            List<string> meta = new List<string> {"","","",""};         
-            
+            List<string> meta = new List<string> { "", "", "", "" };
+
             // Position index for the filename string
             int pos_f = 0;
 
             // If the filename does not match the regular expression the process is aborted. In an optional block only for the current block, else for the file. Sometimes a whole block is to be skipped
             bool break_block = false, break_all = false, break_skip = false;
-          
+
             // opt represents the state of the current block. True for optional.
             bool opt = false;
 
@@ -277,17 +350,17 @@ namespace Nils_Film_DB
                     if (regList[i][0] != '%')
                     {
                         // Find next part of filename that matches the current expression. If not found: break either this block if block is optional or the else break all.
-                       
-                            if (filename.IndexOf(regList[i], pos_f) != -1)
-                                pos_f = filename.IndexOf(regList[i], pos_f) + regList[i].Count();
+
+                        if (filename.IndexOf(regList[i], pos_f) != -1)
+                            pos_f = filename.IndexOf(regList[i], pos_f) + regList[i].Count();
+                        else
+                        {
+                            if (opt)
+                                break_block = true;
                             else
-                            {
-                                if (opt)
-                                    break_block = true;
-                                else
-                                    break_all = true;
-                            }
-                      
+                                break_all = true;
+                        }
+
                     }
                     // Current expression is %-expression. 
                     // It is possible that there are two seperators after this %-expression divided by a '?'. 
@@ -470,7 +543,7 @@ namespace Nils_Film_DB
                 }
                 else
                 {
-                    for (int i=0; i<exp_title.Count(); ++i)
+                    for (int i = 0; i < exp_title.Count(); ++i)
                     {
                         switch (exp_title[i])
                         {
@@ -487,7 +560,7 @@ namespace Nils_Film_DB
                                 meta[3] = exp_value[i];
                                 break;
                         }
-                    }               
+                    }
                 }
                 block_start = block_end + 1;
                 if (break_skip)
@@ -497,7 +570,7 @@ namespace Nils_Film_DB
             }
             while (block_end < regList.Count() && block_start < regList.Count());
             if (break_all)
-                return null;
+                return new List<string>();
             else
                 return meta;
         }

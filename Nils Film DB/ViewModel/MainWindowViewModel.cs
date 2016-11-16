@@ -101,7 +101,9 @@ namespace Nils_Film_DB.ViewModel
 
         private void openScan()
         {
-            ScanViewModel svm = new ScanViewModel(winHelper);
+            DataTable dt_movies = Data_model.Get_movies_full();
+            DataTable dt_versions = Data_model.Get_versions();
+            ScanViewModel svm = new ScanViewModel(winHelper, dt_movies, dt_versions);
         }
 
         // Get Online Data from https://www.themoviedb.org/
@@ -119,11 +121,11 @@ namespace Nils_Film_DB.ViewModel
             List<string> values = new List<string>();
             List<string> rcol = new List<string>();
 
-            columns.Add("_Synchro");
+            columns.Add("tmdb_synchro");
             values.Add("0");
-            rcol.AddRange(new string[7]{"Nr","Titel","Originaltitel","Jahr","Land","Regisseur","Rating"});
-
-            DataTable dt = Data_model.GetTable("Filme", columns, values);
+            rcol.AddRange(new string[12]{"movie_id","title","original_title", "alternative_titles", "DATE_FORMAT(release_date, '%Y') as release_date", "country","genre","rating", "tmdb_id" , "imdb_id" , "poster_path" , "tmdb_synchro" });
+           
+            DataTable dt = Data_model.GetTable("movies", columns, values, rcol);
             OnlineDataViewModel ovm = new OnlineDataViewModel(winHelper, dt);
         }
 
@@ -219,17 +221,32 @@ namespace Nils_Film_DB.ViewModel
             {
                 if (chk.IsChecked)
                 {
-                    if (chk.Title == "Titel")
+                    switch (chk.Title)
                     {
-                        search_options.Add("Filme.Titel");
-                        search_options.Add("Filme.Originaltitel");
-                        search_options.Add("Filme._Titel_alt");
+                        case "Titel":
+                            search_options.Add("m.title");
+                            search_options.Add("m.original_title");
+                            search_options.Add("m.alternative_titles");
+                            break;
+                        case "Regisseur":
+                            search_options.Add("d.name");
+                            break;
+                        case "Schauspieler":
+                            search_options.Add("a.name");
+                            break;
+                        case "Release":
+                            search_options.Add("m.release_date");
+                            break;
+                        case "Land":
+                            search_options.Add("m.country");
+                            break;
+                        case "Genre":
+                            search_options.Add("m.genre");
+                            break;
+                        case "Rating":
+                            search_options.Add("m.rating");
+                            break;
                     }
-                    else if (chk.Title == "Schauspieler")
-                    {
-                        search_options.Add("Filme._Cast");
-                    }
-                    else search_options.Add("Filme." + chk.Title);
                 }
             }
             foreach (CheckBoxViewModel chk in SearchUserBoxes)
@@ -323,7 +340,7 @@ namespace Nils_Film_DB.ViewModel
         {
             DataRow dr = (args as List<object>)[0] as DataRow;
             int pk = Convert.ToInt16((args as List<object>)[1]);
-            Data_model.UpdateRow("Filme", dr, pk);
+            Data_model.UpdateRow("movies", dr, pk);
             populate();
         }
 
@@ -352,7 +369,7 @@ namespace Nils_Film_DB.ViewModel
         {
             username = (args as List<object>)[1].ToString();
             Serverstatustext = Data_model.SetLogin(args as List<object>);
-            if (Serverstatustext != "Verbindungsfehler")
+            if (Serverstatustext.Substring(0, Serverstatustext.IndexOf(':')) == username)
             {
                 populate();              
             }
